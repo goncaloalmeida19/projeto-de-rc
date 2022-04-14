@@ -57,15 +57,18 @@ int admin_console(char* admin_username, char* admin_password, SharedMemory* shar
     		}else if(sscanf(buf, "DEL %s", username) == 1){
     		
     		}else if(strcmp(buf, "LIST") == 0){
-    			
-    		}else if(sscanf(buf, "REFRESH %d", refresh) == 1){
-    		
+                printf("\nList of all users (except admin):\n");
+                print_users();
+    		}else if(sscanf(buf, "REFRESH %d", &refresh) == 1){
+    		    // Alterar o tempo de atualização do valor das ações geradas pelo servidor
+                sprintf(msg, "\nThe stocks value refresh time is now %ds\n", refresh);
     		}else if(strcmp(buf, "QUIT") == 0){
     			break;
     		}else if(strcmp(buf, "QUIT_SERVER") == 0){
     			quit_server = 1;
     			break;
     		}
+            sendto(s, (const char *) msg, strlen(msg), 0, (const struct sockaddr*) &si_admin, slen);
 		}
 		
 		if(quit_server) break;
