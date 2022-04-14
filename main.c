@@ -9,40 +9,40 @@
 #define MAX_MARKETS_NUM 2
 #define MAX_ACTIONS_NUM 3
 
-typedef struct adminData {
+typedef struct {
     char username[WORD_LEN], password[WORD_LEN];
-} admin_data;
+} adminData;
 
-typedef struct userData {
+typedef struct{
     char username[WORD_LEN], password[WORD_LEN];
     double balance;
-} user_data;
+} userData;
 
-typedef struct actionData {
+typedef struct{
     char name[WORD_LEN];
     double balance;
-} action_data;
+} actionData;
 
-typedef struct stockMarket {
+typedef struct{
     char name[WORD_LEN];
-    action_data actions[MAX_ACTIONS_NUM];
-} stock_market;
+    actionData actions[MAX_ACTIONS_NUM];
+} stockMarket;
 
-typedef struct configData {
+typedef struct{
     int users_len;
-    admin_data admin;
-    user_data users[MAX_INIT_USERS_NUM];
-    stock_market markets[MAX_MARKETS_NUM];
-} config_data;
+    adminData admin;
+    userData users[MAX_INIT_USERS_NUM];
+    stockMarket markets[MAX_MARKETS_NUM];
+} configData;
 
-config_data *read_file() {
+configData *read_file() {
     int i, j, market_num = 0, actions_num[MAX_MARKETS_NUM], first_market = 1;
 
     for (j = 0; j < MAX_MARKETS_NUM; j++) actions_num[j] = 0;
 
     double temp_action_balance;
     char last_market[WORD_LEN], new_market[WORD_LEN], temp_action_name[WORD_LEN];
-    config_data *file_data = (config_data *) malloc(sizeof(config_data));
+    configData *file_data = (configData *) malloc(sizeof(configData));
     FILE *fp = fopen(FILE_NAME, "r");
 
     if (fp != NULL) {
@@ -93,7 +93,7 @@ config_data *read_file() {
 
 int main() {
     printf("Hello, World!\n");
-    config_data * lol = read_file();
+    configData * lol = read_file();
     free(lol);
     return 0;
 }
