@@ -79,7 +79,6 @@ configData *read_file() {
         fclose(fp);
         return file_data;
     } else {
-        fclose(fp);
         free(file_data);
         printf("Error in config file\n");
         exit(1);
