@@ -6,7 +6,6 @@
 #define FILE_NAME "config.txt"
 #define WORD_LEN 50
 #define MAX_INIT_USERS_NUM 5
-#define MAX_MARKETS_NUM 2
 #define MAX_STOCKS_NUM 3
 
 typedef struct {
@@ -30,7 +29,9 @@ typedef struct{
     stockMarket markets[MAX_MARKETS_NUM];
 } configData;
 
-configData *read_file() {
+configData * file_data;
+
+void *read_file() {
     int i, j, market_num = 0, stocks_num[MAX_MARKETS_NUM], first_market = 1;
 
     for (j = 0; j < MAX_MARKETS_NUM; j++) stocks_num[j] = 0;
@@ -77,7 +78,6 @@ configData *read_file() {
             }
         }
         fclose(fp);
-        return file_data;
     } else {
         free(file_data);
         printf("Error in config file\n");
@@ -87,8 +87,14 @@ configData *read_file() {
 
 int main() {
     printf("Hello, World!\n");
-    configData * lol = read_file();
-    free(lol);
+    file_data = read_file();
+
+    if(create_shm(file_data->users_len) < 0){
+        exit(1);
+    }
+
+    free(file_data);
+    close_shm();
     return 0;
 }
 
