@@ -72,7 +72,7 @@ int admin_console(char* admin_username, char* admin_password, SharedMemory* shar
                 msg2 = print_users();
                 strcpy(msg, msg2);
     		}else if(sscanf(buf, "REFRESH %d", &refresh) == 1){
-                msg2 = refresh_stocks(refresh);
+                msg2 = update_refresh_time(refresh);
                 strcpy(msg, msg2);
     		}else if(strcmp(buf, "QUIT") == 0){
     			break;

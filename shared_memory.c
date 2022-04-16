@@ -32,6 +32,7 @@ int create_shm(int users_len){
     }
 
     shared_var->users_len = users_len;
+    shared_var->refresh_time = DEFAULT_REFRESH_TIME;
     return 0;
 }
 
@@ -58,11 +59,10 @@ char * print_users(){
     return msg;
 }
 
-char * refresh_stocks(int refresh){
+char * update_refresh_time(int refresh){
     char * msg = (char *) malloc(sizeof(char) * MSG_LEN);
     sprintf(msg, "\nThe stocks value refresh time is now %d\n", refresh);
-    // Alterar o tempo de atualização do valor das ações geradas pelo servidor (To do later)
-
+    shared_var->refresh_time = refresh;
     return msg;
 }
 
