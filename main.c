@@ -1,6 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+#include <sys/wait.h>
+#include "admin_console.h"
 #include "shared_memory.h"
 
 #define FILE_NAME "config.txt"
@@ -37,14 +40,13 @@ void read_file() {
 
     double temp_stock_balance;
     char last_market[WORD_LEN], new_market[WORD_LEN], temp_stock_name[WORD_LEN];
-    configData *file_data = (configData *) malloc(sizeof(configData));
+    file_data = (configData *) malloc(sizeof(configData));
     FILE *fp = fopen(FILE_NAME, "r");
 
     if (fp != NULL) {
-        fscanf(fp, "%[^/ ]/ %50s", file_data->admin.username, file_data->admin.password);
+        fscanf(fp, "%[^/ ]/ %s", file_data->admin.username, file_data->admin.password);
         fscanf(fp, "%d", &file_data->users_len);
-
-        // Can be 6 users (admin + 5 initial ones)
+        // There can be 6 users (admin + 5 initial ones)
         if (file_data->users_len <= 5 && file_data->users_len >= 1) {
             for (i = 0; i < file_data->users_len; i++) {
                 fscanf(fp, " %[^; ] ; %[^; ] ; %lf", file_data->users[i].username, file_data->users[i].password,
@@ -58,24 +60,24 @@ void read_file() {
             exit(1);
         }
 
-        while (market_num <= 2) {
+        while (market_num < 2) {
             if (fscanf(fp, " %[^; ] ; %[^; ] ; %lf", new_market, temp_stock_name, &temp_stock_balance) != 3)
                 break;
             if (first_market) {
                 strcpy(file_data->markets[market_num].name, new_market);
                 strcpy(last_market, new_market);
                 first_market = 0;
-            } else if (strcmp(last_market, new_market) != 0) {  // Não são iguais
+            } else if (strcmp(last_market, new_market) != 0) {
                     market_num++;
                     strcpy(file_data->markets[market_num].name, new_market);
                     strcpy(last_market, new_market);
             }
             strcpy(file_data->markets[market_num].stocks[stocks_num[market_num]].name, temp_stock_name);
-            file_data->markets[market_num].stocks[stocks_num[market_num]++].balance = temp_stock_balance;
+            file_data->markets[market_num].stocks[stocks_num[market_num]].balance = temp_stock_balance;
             if (stocks_num[market_num]++ > MAX_STOCKS_NUM){
                 printf("Number of stocks in a market needs to be lower than 4\n");
                 exit(1);
-            }
+            } 
         }
         fclose(fp);
     } else {
@@ -86,16 +88,27 @@ void read_file() {
 }
 
 int main() {
+	int i;
     printf("Hello, World!\n");
     read_file();
-
-    if(create_shm(file_data->users_len) < 0){
+    if(create_shm() < 0){
         exit(1);
     }
 
-    free(file_data);
+	for(i = 0; i < file_data->users_len; i++){
+		create_user(file_data->users[i].username, file_data->users[i].password, file_data->users[i].markets, file_data->users[i].balance, file_data->users[i].num_markets);
+	}
+	
+    if(fork()==0){
+    	admin_console(file_data->admin.username, file_data->admin.password);
+    	
+    	exit(0);
+    }
+    
+    wait(NULL);
     close_shm();
-    return 0;
+    free(file_data);
+    exit(0);
 }
 
 
