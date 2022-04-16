@@ -92,6 +92,6 @@ int create_user(char username[WORD_LEN], char password[WORD_LEN], char markets[M
     }
 
     shared_var->users[shared_var->users_len - 1].balance = balance;
-    shared_var->users[shared_var->users_len - 1].num_markets = num_markets;
+    shared_var->users[shared_var->users_len++ - 1].num_markets = num_markets; // users_len is incremented in 1
     return 0;
 }

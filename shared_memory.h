@@ -1,4 +1,5 @@
 #include <semaphore.h>
+
 #define WORD_LEN 50
 #define MAX_USERS_NUM 10
 #define MSG_LEN WORD_LEN * 100

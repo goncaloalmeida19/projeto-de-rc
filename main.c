@@ -4,7 +4,6 @@
 #include "shared_memory.h"
 
 #define FILE_NAME "config.txt"
-#define WORD_LEN 50
 #define MAX_INIT_USERS_NUM 5
 #define MAX_STOCKS_NUM 3
 
@@ -31,7 +30,7 @@ typedef struct{
 
 configData * file_data;
 
-void *read_file() {
+void read_file() {
     int i, j, market_num = 0, stocks_num[MAX_MARKETS_NUM], first_market = 1;
 
     for (j = 0; j < MAX_MARKETS_NUM; j++) stocks_num[j] = 0;
@@ -45,6 +44,7 @@ void *read_file() {
         fscanf(fp, "%[^/ ]/ %50s", file_data->admin.username, file_data->admin.password);
         fscanf(fp, "%d", &file_data->users_len);
 
+        // Can be 6 users (admin + 5 initial ones)
         if (file_data->users_len <= 5 && file_data->users_len >= 1) {
             for (i = 0; i < file_data->users_len; i++) {
                 fscanf(fp, " %[^; ] ; %[^; ] ; %lf", file_data->users[i].username, file_data->users[i].password,
@@ -87,7 +87,7 @@ void *read_file() {
 
 int main() {
     printf("Hello, World!\n");
-    file_data = read_file();
+    read_file();
 
     if(create_shm(file_data->users_len) < 0){
         exit(1);

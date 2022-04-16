@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <arpa/inet.h>
+#include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>
 #include "shared_memory.h"
@@ -10,7 +11,7 @@
 
 int admin_console(char* admin_username, char* admin_password, SharedMemory* shared_var){
 	struct sockaddr_in si_server, si_admin;
-    socklen_t slen = sizeof(sockaddr_in);
+    socklen_t slen = sizeof(struct sockaddr_in);
     int s, recv_len, quit_server = 0, refresh;
     double balance;
     char buf[WORD_LEN], msg[MSG_LEN], username[WORD_LEN], password[WORD_LEN], market[WORD_LEN], market2[WORD_LEN], * msg2, markets[MAX_MARKETS_NUM][WORD_LEN];
