@@ -12,26 +12,26 @@
 
 typedef struct {
     char username[WORD_LEN], password[WORD_LEN];
-} adminData;
+} AdminData;
 
 typedef struct{
     char name[WORD_LEN];
     double balance;
-} stockData;
+} StockData;
 
 typedef struct{
     char name[WORD_LEN];
-    stockData stocks[MAX_STOCKS_NUM];
-} stockMarket;
+    StockData stocks[MAX_STOCKS_NUM];
+} StockMarket;
 
 typedef struct{
     int users_len;
-    adminData admin;
-    userData users[MAX_INIT_USERS_NUM];
-    stockMarket markets[MAX_MARKETS_NUM];
-} configData;
+    AdminData admin;
+    UserData users[MAX_INIT_USERS_NUM];
+    StockMarket markets[MAX_MARKETS_NUM];
+} ConfigData;
 
-configData * file_data;
+ConfigData * file_data;
 
 void read_file() {
     int i, j, market_num = 0, stocks_num[MAX_MARKETS_NUM], first_market = 1;
@@ -40,16 +40,20 @@ void read_file() {
 
     double temp_stock_balance;
     char last_market[WORD_LEN], new_market[WORD_LEN], temp_stock_name[WORD_LEN];
-    file_data = (configData *) malloc(sizeof(configData));
+    file_data = (ConfigData *) malloc(sizeof(ConfigData));
+    if(file_data == NULL){
+    	printf("Error allocating memory for the config file data\n");
+    	exit(1);
+    }
     FILE *fp = fopen(FILE_NAME, "r");
 
     if (fp != NULL) {
-        fscanf(fp, "%[^/ ]/ %s", file_data->admin.username, file_data->admin.password);
+        fscanf(fp, " %[^/]/ %s", file_data->admin.username, file_data->admin.password);
         fscanf(fp, "%d", &file_data->users_len);
         // There can be 6 users (admin + 5 initial ones)
         if (file_data->users_len <= 5 && file_data->users_len >= 1) {
             for (i = 0; i < file_data->users_len; i++) {
-                fscanf(fp, " %[^; ] ; %[^; ] ; %lf", file_data->users[i].username, file_data->users[i].password,
+                fscanf(fp, " %[^;]; %[^;]; %lf", file_data->users[i].username, file_data->users[i].password,
                        &file_data->users[i].balance);
             }
         } else if (file_data->users_len > MAX_INIT_USERS_NUM) {
@@ -61,7 +65,7 @@ void read_file() {
         }
 
         while (market_num < 2) {
-            if (fscanf(fp, " %[^; ] ; %[^; ] ; %lf", new_market, temp_stock_name, &temp_stock_balance) != 3)
+            if (fscanf(fp, " %[^;]; %[^;]; %lf", new_market, temp_stock_name, &temp_stock_balance) != 3)
                 break;
             if (first_market) {
                 strcpy(file_data->markets[market_num].name, new_market);
@@ -89,7 +93,7 @@ void read_file() {
 
 int main() {
 	int i;
-    printf("Hello, World!\n");
+    printf("Server opened!\n");
     read_file();
     if(create_shm() < 0){
         exit(1);
@@ -100,8 +104,8 @@ int main() {
 	}
 	
     if(fork()==0){
-    	admin_console(file_data->admin.username, file_data->admin.password);
-    	
+    	if(admin_console(file_data->admin.username, file_data->admin.password)<0)
+    		exit(1);
     	exit(0);
     }
     
