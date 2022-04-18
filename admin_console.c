@@ -96,6 +96,7 @@ int admin_console(char* admin_username, char* admin_password, const int PORTO_CO
                 if(return_value == 0) strcpy(msg, "A new user has been added!\n");
                 else if(return_value == -1) strcpy(msg, "New user cannot be created!\n");
                 else if(return_value == -2) strcpy(msg, "User found but the password is wrong!\n");
+                else if(return_value == -3) strcpy(msg, "Market does not exist!\n");
                 else strcpy(msg, "User updated\n");
                 
     		}else if(sscanf(buf, "ADD_USER %s %s %s %s %lf\n", username, password, market, market2, &balance) == 5){
@@ -105,6 +106,7 @@ int admin_console(char* admin_username, char* admin_password, const int PORTO_CO
                 if(return_value == 0) strcpy(msg, "A new user has been added!\n");
                 else if(return_value == -1) strcpy(msg, "New user cannot be created!\n");
                 else if(return_value == -2) strcpy(msg, "User found but the password is wrong!\n");
+                else if(return_value == -3) strcpy(msg, "Market does not exist!\n");
                 else strcpy(msg, "User updated\n");
                 
     		}else if(sscanf(buf, "DEL %s\n", username) == 1){

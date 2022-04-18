@@ -5,6 +5,7 @@
 #define MAX_USERS_NUM 10
 #define MSG_LEN WORD_LEN * 20
 #define MAX_MARKETS_NUM 2
+#define MAX_STOCKS_NUM 3
 #define DEFAULT_REFRESH_TIME 2
 
 typedef struct{
@@ -14,11 +15,21 @@ typedef struct{
     int num_markets;
 } UserData;
 
+typedef struct{
+    char name[WORD_LEN];
+    double balance;
+} StockData;
+
+typedef struct{
+    char name[WORD_LEN];
+    StockData stocks[MAX_STOCKS_NUM];
+} StockMarket;
+
+int create_shm(StockMarket markets[MAX_MARKETS_NUM], int num_markets);
 void close_shm();
 char* print_users();
 void update_refresh_time(int refresh);
-int create_shm();
-int delete_user(char *username);
 int create_user(char *username, char *password, char markets[MAX_MARKETS_NUM][WORD_LEN], double balance, int num_markets);
+int delete_user(char *username);
 
 #endif

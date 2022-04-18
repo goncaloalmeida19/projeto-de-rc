@@ -10,8 +10,10 @@
 
 typedef struct{
     int users_len;
-    UserData users[MAX_USERS_NUM];
     int refresh_time;
+    int num_markets;
+    UserData users[MAX_USERS_NUM];
+    StockMarket markets[MAX_MARKETS_NUM];
 }SharedMemory;
 
 sem_t* shm_mutex;
@@ -26,7 +28,9 @@ int create_semaphore(){
     return 0;
 }
 
-int create_shm(){
+int create_shm(StockMarket markets[MAX_MARKETS_NUM], int num_markets){
+    int i;
+    
     //create shared memory
     if((shmid = shmget(IPC_PRIVATE, sizeof(SharedMemory), IPC_CREAT|0766))<0){
         perror("Error creating shared memory");
@@ -46,6 +50,12 @@ int create_shm(){
 	
     shared_var->users_len = 0;
     shared_var->refresh_time = DEFAULT_REFRESH_TIME;
+    shared_var->num_markets = num_markets;
+    //save markets
+    for(i = 0; i < num_markets; i++){
+    	shared_var->markets[i] = markets[i];
+    }
+    
     return 0;
 }
 
@@ -107,12 +117,13 @@ int delete_user(char *username){
 
 int create_user(char *username, char *password, char markets[MAX_MARKETS_NUM][WORD_LEN], double balance, int num_markets){
 	sem_wait(shm_mutex);
-	int i, user_changed = 0;
+	int i, j, market_exists, user_changed = 0;
     if (shared_var->users_len >= MAX_USERS_NUM) {
     	sem_post(shm_mutex);
         return -1;
     }
     UserData *current_user = &shared_var->users[shared_var->users_len];
+    //check if user already exists and password is correct
     for(i = 0; i < shared_var->users_len; i++){
         if(strcmp(shared_var->users[i].username, username) == 0){
         	if(strcmp(shared_var->users[i].password, password) == 0){
@@ -125,6 +136,20 @@ int create_user(char *username, char *password, char markets[MAX_MARKETS_NUM][WO
         		return -2;
         	}
        	}
+    }
+    //check if markets exist
+    for(i = 0; i < num_markets; i++){
+    	market_exists = 0;
+    	for(j = 0; j < shared_var->num_markets; j++){
+    		if(strcmp(markets[i], shared_var->markets[j].name) == 0){
+    			market_exists = 1;
+    			break;
+    		}
+    	}
+    	if(!market_exists){
+    		sem_post(shm_mutex);
+    		return -3;
+    	}
     }
     strcpy(current_user->username, username);
     strcpy(current_user->password, password);
