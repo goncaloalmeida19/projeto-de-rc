@@ -6,7 +6,6 @@
 #include "admin_console.h"
 #include "shared_memory.h"
 
-#define FILE_NAME "config.txt"
 #define MAX_INIT_USERS_NUM 5
 #define MAX_STOCKS_NUM 3
 
@@ -33,7 +32,7 @@ typedef struct{
 
 ConfigData * file_data;
 
-void read_file() {
+void read_file(const char * FILE_NAME) {
     int i, j, market_num = 0, stocks_num[MAX_MARKETS_NUM], first_market = 1;
 
     for (j = 0; j < MAX_MARKETS_NUM; j++) stocks_num[j] = 0;
@@ -48,13 +47,22 @@ void read_file() {
     FILE *fp = fopen(FILE_NAME, "r");
 
     if (fp != NULL) {
-        fscanf(fp, " %[^/]/ %s", file_data->admin.username, file_data->admin.password);
-        fscanf(fp, "%d", &file_data->users_len);
+        if(fscanf(fp, " %[^/]/ %s", file_data->admin.username, file_data->admin.password) != 2){
+        	printf("Wrong file format\n");
+        	exit(1);
+        }
+        if(fscanf(fp, "%d", &file_data->users_len) != 1){
+        	printf("Wrong file format\n");
+        	exit(1);
+        }
         // There can be 6 users (admin + 5 initial ones)
         if (file_data->users_len <= 5 && file_data->users_len >= 1) {
             for (i = 0; i < file_data->users_len; i++) {
-                fscanf(fp, " %[^;]; %[^;]; %lf", file_data->users[i].username, file_data->users[i].password,
-                       &file_data->users[i].balance);
+                if(fscanf(fp, " %[^;]; %[^;]; %lf", file_data->users[i].username, file_data->users[i].password,
+                       &file_data->users[i].balance) != 3){
+                	printf("Wrong file format\n");
+        			exit(1);      
+                }
             }
         } else if (file_data->users_len > MAX_INIT_USERS_NUM) {
             printf("Number of initial users needs to be lower than 6\n");
@@ -91,10 +99,15 @@ void read_file() {
     }
 }
 
-int main() {
+int main(int argc, char *argv[]) {
+	if(argc != 4){
+		printf("Wrong number of arguments\n");
+		exit(1);
+	}
+	
 	int i;
     printf("Server opened!\n");
-    read_file();
+    read_file(argv[3]);
     if(create_shm() < 0){
         exit(1);
     }
@@ -104,7 +117,7 @@ int main() {
 	}
 	
     if(fork()==0){
-    	if(admin_console(file_data->admin.username, file_data->admin.password)<0)
+    	if(admin_console(file_data->admin.username, file_data->admin.password, atoi(argv[2]))<0)
     		exit(1);
     	exit(0);
     }
@@ -112,6 +125,7 @@ int main() {
     wait(NULL);
     close_shm();
     free(file_data);
+    printf("Server closed!\n");
     exit(0);
 }
 

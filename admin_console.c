@@ -7,8 +7,6 @@
 #include <unistd.h>
 #include "shared_memory.h"
 
-#define PORTO_CONFIG 9000
-
 void sockaddr_in_copy(struct sockaddr_in *new, struct sockaddr_in *old){
 	new->sin_family = old->sin_family;
     new->sin_port = old->sin_port;
@@ -19,7 +17,7 @@ int compare_sockaddr_in(struct sockaddr_in *si1, struct sockaddr_in *si2){
 	return (si1->sin_family == si2->sin_family) && (si1->sin_port == si2->sin_port) && (si1->sin_addr.s_addr == si2->sin_addr.s_addr);
 }
 
-int admin_console(char* admin_username, char* admin_password){
+int admin_console(char* admin_username, char* admin_password, const int PORTO_CONFIG){
 	struct sockaddr_in si_server, si_admin, si_admin_copy;
     socklen_t slen = sizeof(struct sockaddr_in);
     int s, recv_len, quit_server = 0, quit_console = 0, refresh;
@@ -99,6 +97,7 @@ int admin_console(char* admin_username, char* admin_password){
                 else if(return_value == -1) strcpy(msg, "New user cannot be created!\n");
                 else if(return_value == -2) strcpy(msg, "User found but the password is wrong!\n");
                 else strcpy(msg, "User updated\n");
+                
     		}else if(sscanf(buf, "ADD_USER %s %s %s %s %lf\n", username, password, market, market2, &balance) == 5){
                 strcpy(markets[0], market);
                 strcpy(markets[1], market2);
@@ -107,6 +106,7 @@ int admin_console(char* admin_username, char* admin_password){
                 else if(return_value == -1) strcpy(msg, "New user cannot be created!\n");
                 else if(return_value == -2) strcpy(msg, "User found but the password is wrong!\n");
                 else strcpy(msg, "User updated\n");
+                
     		}else if(sscanf(buf, "DEL %s\n", username) == 1){
                 if(delete_user(username) == 0) sprintf(msg, "User with the username %s has been deleted!\n", username);
                 else sprintf(msg, "User with the username %s not found!\n", username);
