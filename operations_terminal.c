@@ -13,14 +13,16 @@
 #include <unistd.h>
 #include <netdb.h>
 #include <signal.h>
-#include "shared_memory.h"
+
+#define WORD_LEN 50
+#define MSG_LEN WORD_LEN*20
 
 char username[WORD_LEN];
 
 int main(int argc, char *argv[]){
     struct hostent *hostPtr;
     struct sockaddr_in addr;
-    char server_addr[100], buffer[MSG_LEN], login_msg[MSG_LEN], client_markets[MAX_MARKETS_NUM][WORD_LEN];
+    char server_addr[WORD_LEN], buffer[MSG_LEN], market1[WORD_LEN], market2[WORD_LEN];
     int fd, nread = 0, option = 0, login_error;
 
     if(argc != 3){
@@ -52,34 +54,38 @@ int main(int argc, char *argv[]){
             break;
         }
         buffer[nread] = '\0';
-
+		printf("%s\n", buffer);
         // Verify the content of the mensage sent by the server
         if(strcmp(buffer, "asklogin") == 0) {
-            printf("Name/Password: ");
-            scanf("%s/%s", username, password);
+            printf("Name Password: ");
+            scanf("%s %s", username, password);
             sprintf(buffer, "login %s %s", username, password);
+            printf("%s\n", buffer);
         }
-        else if(sscanf(buffer, "login %s", login_msg) == 1)
-            printf("Login successful! Client can access to the market %s.\n", client_markets[0]);
-        else if(sscanf(buffer, "login %s %s", client_markets[0], client_markets[1]) == 1)
-            printf("Login successful! Client can access to the markets %s and %s.\n", client_markets[0], client_markets[1]);
         else if(sscanf(buffer, "login %d", &login_error) == 1) {
             if (login_error == 1) {
                 printf("Username not found.\n");
             } else {
                 printf("Wrong Password.\n");
             }
-            printf("1 - Try again\n2 - Close console\nOption: ");
+            printf("1 - Try again\n2 - Close console\nOption: \n");
             scanf("%d", &option);
             if (option == 1) {
-                printf("Name/Password: ");
-                scanf("%s/%s", username, password);
+                printf("Name Password: ");
+                scanf("%s %s", username, password);
                 sprintf(buffer, "login %s %s", username, password);
-            } else {
+            } else if (option == 2){
                 printf("Console closed.\n");
                 break;
             }
+            else printf("Invalid command.\n");
         }
+        else if(sscanf(buffer, "login %s", market1) == 1)
+            printf("Login successful! Client can access to the market %s.\n", market1);
+        else if(sscanf(buffer, "login %s %s", market1, market2) == 1)
+            printf("Login successful! Client can access to the markets %s and %s.\n", market1, market2);
+        else if(strncmp(buffer, "login", 5) == 0)
+        	printf("Login successful! Client doesn't have access to any markets.\n");
         else printf("Invalid command.\n");
 
         // Sent input to the server

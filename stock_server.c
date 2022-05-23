@@ -19,7 +19,7 @@ pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 void* server_thread(void *t){
 	int fd = *((int*)t), nread;
-	char msg[MSG_LEN], msg_aux1[MSG_LEN], msg_aux2[MSG_LEN], *msg_temp;
+	char msg[MSG_LEN], buffer[MSG_LEN], msg_aux1[MSG_LEN], msg_aux2[MSG_LEN], *msg_temp;
 	
 	//ask client for log in information
 	strcpy(msg, "asklogin"); 
@@ -29,16 +29,16 @@ void* server_thread(void *t){
 	
 	while(1){
 		//receive client command
-		nread = read(fd, msg, MSG_LEN-1);
+		nread = read(fd, buffer, MSG_LEN-1);
 		if(nread <= 0){
 			close(fd);
 			pthread_exit(NULL);
 		}
-		msg[nread] = '\0';
-		
-		if(sscanf(msg, "login %s %s", msg_aux1, msg_aux2) == 2){
+		buffer[nread] = '\0';
+		printf("%s\n", buffer);
+		if(sscanf(buffer, "login %s %s", msg_aux1, msg_aux2) == 2){
 			int result = log_in(msg_aux1, msg_aux2);
-			if(result != 0){
+			if(result < 0){
 				sprintf(msg, "login %d", -result);
 				write(fd, msg, strlen(msg)+1);
 				continue;
@@ -55,8 +55,6 @@ void* server_thread(void *t){
 		} else {
 			printf("Wrong command => %s\n", msg);
 		}
-		
-		sleep(1);
 	}
 	pthread_exit(NULL);
 		
@@ -83,9 +81,11 @@ int stock_server(const int PORTO_BOLSA){
 		printf("Stock Server: Listen error\n");
 		return -1;	
 	}
-  	sockaddr_in_size = sizeof(new_client_addr);
+  	sockaddr_in_size = sizeof(struct sockaddr_in);
 	while(1){
+		printf("a\n");
 		new_client = accept(fd,(struct sockaddr *)&new_client_addr,(socklen_t *)&sockaddr_in_size);
+		printf("b\n");
 		if(new_client > 0){
 			if(user_count >= MAX_USERS){
 				strcpy(msg, "userlimit"); 
@@ -97,7 +97,7 @@ int stock_server(const int PORTO_BOLSA){
 			pthread_create(&threads[user_count], NULL, server_thread, &client_fds[user_count]);
 			user_count++;
 		}
-		
+		pthread_join(threads[user_count-1], NULL);
 		sleep(1);
 	}
 }

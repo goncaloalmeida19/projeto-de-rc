@@ -33,4 +33,4 @@ stock_server.o: stock_server.c stock_server.h shared_memory.h
 
 shared_memory.o: shared_memory.c shared_memory.h
 
-operations_terminal.o: operations_terminal.c operations_terminal.h shared_memory.h
+operations_terminal.o: operations_terminal.c operations_terminal.h
