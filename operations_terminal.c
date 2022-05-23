@@ -22,7 +22,7 @@ char username[WORD_LEN];
 int main(int argc, char *argv[]){
     struct hostent *hostPtr;
     struct sockaddr_in addr;
-    char server_addr[WORD_LEN], buffer[MSG_LEN], market1[WORD_LEN], market2[WORD_LEN];
+    char server_addr[WORD_LEN], buffer[MSG_LEN], msg[MSG_LEN], market1[WORD_LEN], market2[WORD_LEN];
     int fd, nread = 0, option = 0, login_error;
 
     if(argc != 3){
@@ -54,13 +54,12 @@ int main(int argc, char *argv[]){
             break;
         }
         buffer[nread] = '\0';
-		printf("%s\n", buffer);
+
         // Verify the content of the mensage sent by the server
         if(strcmp(buffer, "asklogin") == 0) {
             printf("Name Password: ");
             scanf("%s %s", username, password);
-            sprintf(buffer, "login %s %s", username, password);
-            printf("%s\n", buffer);
+            sprintf(msg, "login %s %s", username, password);
         }
         else if(sscanf(buffer, "login %d", &login_error) == 1) {
             if (login_error == 1) {
@@ -73,7 +72,7 @@ int main(int argc, char *argv[]){
             if (option == 1) {
                 printf("Name Password: ");
                 scanf("%s %s", username, password);
-                sprintf(buffer, "login %s %s", username, password);
+                sprintf(msg, "login %s %s", username, password);
             } else if (option == 2){
                 printf("Console closed.\n");
                 break;
@@ -89,7 +88,7 @@ int main(int argc, char *argv[]){
         else printf("Invalid command.\n");
 
         // Sent input to the server
-        write(fd, buffer, strlen(buffer)+1);
+        write(fd, msg, strlen(msg)+1);
 
     }while(1);
 

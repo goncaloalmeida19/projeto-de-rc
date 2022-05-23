@@ -83,9 +83,7 @@ int stock_server(const int PORTO_BOLSA){
 	}
   	sockaddr_in_size = sizeof(struct sockaddr_in);
 	while(1){
-		printf("a\n");
 		new_client = accept(fd,(struct sockaddr *)&new_client_addr,(socklen_t *)&sockaddr_in_size);
-		printf("b\n");
 		if(new_client > 0){
 			if(user_count >= MAX_USERS){
 				strcpy(msg, "userlimit"); 
