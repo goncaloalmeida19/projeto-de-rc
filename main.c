@@ -3,6 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include "stock_server.h"
 #include "admin_console.h"
 #include "shared_memory.h"
 
@@ -91,6 +92,7 @@ void read_file(const char * FILE_NAME) {
         exit(1);
     }
 }
+
 
 int main(int argc, char *argv[]) {
 	if(argc != 4){

@@ -1,7 +1,7 @@
 CC = gcc
 FLAGS = -Wall
 LIBS = -pthread
-OBJS = main.o shared_memory.o admin_console.o
+OBJS = main.o shared_memory.o stock_server.o admin_console.o 
 PROG = stock_server
 
 # GENERIC
@@ -23,5 +23,7 @@ ${PROG}: ${OBJS}
 main.o: main.c admin_console.h shared_memory.h
 
 admin_console.o: admin_console.c admin_console.h shared_memory.h
+
+stock_server.o: stock_server.c stock_server.h shared_memory.h
 
 shared_memory.o: shared_memory.c shared_memory.h

@@ -12,7 +12,7 @@ typedef struct{
     char username[WORD_LEN], password[WORD_LEN];
     double balance;
     char markets[MAX_MARKETS_NUM][WORD_LEN];
-    int num_markets;
+    int num_markets, logged_in;
 } UserData;
 
 typedef struct{

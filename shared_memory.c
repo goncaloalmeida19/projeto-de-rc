@@ -70,6 +70,44 @@ void close_shm(){
     shmctl(shmid, IPC_RMID, NULL);
 }
 
+int log_in(char* username, char* password){
+	sem_wait(shm_mutex);
+	for(i = 0; i < shared_var->users_len; i++){
+        if(strcmp(shared_var->users[i].username, username) == 0){
+        	if(strcmp(shared_var->users[i].password, password) == 0){
+        		shared_var->users[i].logged_in = 1;
+        		sem_post(shm_mutex);
+        		return 0;
+        	}
+        	else{
+        		sem_post(shm_mutex);
+        		return -2;
+        	}
+       	}
+    }
+    sem_post(shm_mutex);
+    return -1;
+}
+
+int log_out(char* username, char* password){
+	sem_wait(shm_mutex);
+	for(i = 0; i < shared_var->users_len; i++){
+        if(strcmp(shared_var->users[i].username, username) == 0){
+        	if(strcmp(shared_var->users[i].password, password) == 0){
+        		shared_var->users[i].logged_in = 0;
+        		sem_post(shm_mutex);
+        		return 0;
+        	}
+        	else{
+        		sem_post(shm_mutex);
+        		return -2;
+        	}
+       	}
+    }
+    sem_post(shm_mutex);
+    return -1;
+}
+
 char * print_users(){
 	sem_wait(shm_mutex);
     int i;
