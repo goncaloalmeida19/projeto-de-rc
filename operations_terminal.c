@@ -17,11 +17,11 @@
 
 char username[WORD_LEN];
 
-void operations_terminal(int argc, char *argv[]){
+int main(int argc, char *argv[]){
     struct hostent *hostPtr;
     struct sockaddr_in addr;
-    char server_addr[100], buffer[MSG_LEN], login_msg[MSG_LEN], * markets, client_markets[MAX_MARKETS_NUM][WORD_LEN];
-    int fd, nread = 0, client_id = 0, option = 0, no_input = 0, n_markets = 0;
+    char server_addr[100], buffer[MSG_LEN], login_msg[MSG_LEN], client_markets[MAX_MARKETS_NUM][WORD_LEN];
+    int fd, nread = 0, option = 0, no_input = 0, n_markets = 0, login_error;
 
     if(argc != 3){
         printf("Wrong number of arguments\n");
@@ -54,34 +54,28 @@ void operations_terminal(int argc, char *argv[]){
         buffer[nread] = '\0';
 
         // Verify the content of the mensage sent by the server
-        if(sscanf(buffer, "credentials %d", &client_id) == 1)
+        if(strcmp(buffer, "asklogin") == 0)
             printf("Name/Password: ");
-        else if(sscanf(buffer, "login %s", login_msg) == 1){
-            if(strcmp(login_msg,"1") == 0 || strcmp(login_msg,"2") == 0) {
-                if (strcmp(login_msg, "1") == 0){
-                    printf("Username not found.\n");
-                } else {
-                    printf("Wrong Password.\n");
-                }
-                printf("1 - Try again\n2 - Close console\nOption: ");
-                scanf("%d", &option);
-                if (option == 1) {
-                    printf("Name/Password: ");
-                } else {
-                    printf("Console closed.\n");
-                    break;
-                }
-            } else{
-                markets = strtok(login_msg, " ");
-                while (markets != strtok(NULL, " "))
-                    strcpy(client_markets[n_markets++], markets);
-                if(n_markets == 1){
-                    printf("Login successful! Client can access to the market %s.\n", client_markets[0]);
-                } else {
-                    printf("Login successful! Client can access to the markets %s and %s.\n", client_markets[0], client_markets[1]);
-                }
+        else if(sscanf(buffer, "login %s", login_msg) == 1)
+            printf("Login successful! Client can access to the market %s.\n", client_markets[0]);
+        else if(sscanf(buffer, "login %s %s", client_markets[0], client_markets[1]) == 1)
+            printf("Login successful! Client can access to the markets %s and %s.\n", client_markets[0], client_markets[1]);
+        else if(sscanf(buffer, "login %d", &login_error) == 1) {
+            if (login_error == 1) {
+                printf("Username not found.\n");
+            } else {
+                printf("Wrong Password.\n");
             }
-        }else erro("comando invalido");
+            printf("1 - Try again\n2 - Close console\nOption: ");
+            scanf("%d", &option);
+            if (option == 1) {
+                printf("Name/Password: ");
+            } else {
+                printf("Console closed.\n");
+                break;
+            }
+        }
+        else printf("Invalid command.\n");
 
         // Read the input and sent it to the server
         scanf("%s", buffer);
@@ -90,5 +84,5 @@ void operations_terminal(int argc, char *argv[]){
     }while(1);
 
     close(fd);
-    exit(0);
+    return 0;
 }
