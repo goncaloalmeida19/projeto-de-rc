@@ -54,8 +54,11 @@ int main(int argc, char *argv[]){
         buffer[nread] = '\0';
 
         // Verify the content of the mensage sent by the server
-        if(strcmp(buffer, "asklogin") == 0)
+        if(strcmp(buffer, "asklogin") == 0) {
             printf("Name/Password: ");
+            scanf("%s/%s", username, password);
+            sprintf(buffer, "login %s %s", username, password);
+        }
         else if(sscanf(buffer, "login %s", login_msg) == 1)
             printf("Login successful! Client can access to the market %s.\n", client_markets[0]);
         else if(sscanf(buffer, "login %s %s", client_markets[0], client_markets[1]) == 1)
@@ -70,6 +73,8 @@ int main(int argc, char *argv[]){
             scanf("%d", &option);
             if (option == 1) {
                 printf("Name/Password: ");
+                scanf("%s/%s", username, password);
+                sprintf(buffer, "login %s %s", username, password);
             } else {
                 printf("Console closed.\n");
                 break;
@@ -77,8 +82,7 @@ int main(int argc, char *argv[]){
         }
         else printf("Invalid command.\n");
 
-        // Read the input and sent it to the server
-        scanf("%s", buffer);
+        // Sent input to the server
         write(fd, buffer, strlen(buffer)+1);
 
     }while(1);
