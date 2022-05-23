@@ -70,42 +70,52 @@ void close_shm(){
     shmctl(shmid, IPC_RMID, NULL);
 }
 
-int log_in(char* username, char* password){
-	sem_wait(shm_mutex);
-	for(i = 0; i < shared_var->users_len; i++){
+int find_user(const char* username, const char* password){
+	for(int i = 0; i < shared_var->users_len; i++){
         if(strcmp(shared_var->users[i].username, username) == 0){
-        	if(strcmp(shared_var->users[i].password, password) == 0){
-        		shared_var->users[i].logged_in = 1;
-        		sem_post(shm_mutex);
-        		return 0;
-        	}
-        	else{
-        		sem_post(shm_mutex);
-        		return -2;
-        	}
+        	//user found
+        	
+        	if(password == NULL) return i; //password is not necessary
+        		
+        	if(strcmp(shared_var->users[i].password, password) == 0) return i; //username and password correct
+        		
+			//wrong password
+			return -2;
        	}
     }
-    sem_post(shm_mutex);
+    //user not found
     return -1;
 }
 
-int log_out(char* username, char* password){
+
+int log_in(const char* username, const char* password){
 	sem_wait(shm_mutex);
-	for(i = 0; i < shared_var->users_len; i++){
-        if(strcmp(shared_var->users[i].username, username) == 0){
-        	if(strcmp(shared_var->users[i].password, password) == 0){
-        		shared_var->users[i].logged_in = 0;
-        		sem_post(shm_mutex);
-        		return 0;
-        	}
-        	else{
-        		sem_post(shm_mutex);
-        		return -2;
-        	}
-       	}
-    }
+	int user = find_user(username, password);
     sem_post(shm_mutex);
-    return -1;
+    return user;
+}
+
+int log_out(const char* username){
+	sem_wait(shm_mutex);
+	int user = find_user(username, NULL);
+    sem_post(shm_mutex);
+    return user;
+}
+
+char* user_markets(const char* username){
+	sem_wait(shm_mutex);
+	int user = find_user(username, NULL);
+	if(user < 0){
+		sem_post(shm_mutex);
+		return NULL;
+	}
+	char* msg = (char*)malloc(sizeof(char) * shared_var->users[user].num_markets * WORD_LEN + 1);
+	strcpy(msg, shared_var->users[user].markets[0]);
+	if(shared_var->users[user].num_markets == 2){
+		strcat(msg, " ");
+		strcat(msg, shared_var->users[user].markets[1]);
+	}
+	return msg;	
 }
 
 char * print_users(){

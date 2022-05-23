@@ -111,6 +111,10 @@ int main(int argc, char *argv[]) {
 		create_user(file_data->users[i].username, file_data->users[i].password, file_data->users[i].markets, file_data->users[i].balance, file_data->users[i].num_markets);
 	}
 	
+	if(stock_server(atoi(argv[1])) < 0){
+		exit(1);
+	}
+	
     if(fork()==0){
     	if(admin_console(file_data->admin.username, file_data->admin.password, atoi(argv[2]))<0)
     		exit(1);

@@ -21,7 +21,7 @@ int main(int argc, char *argv[]){
     struct hostent *hostPtr;
     struct sockaddr_in addr;
     char server_addr[100], buffer[MSG_LEN], login_msg[MSG_LEN], client_markets[MAX_MARKETS_NUM][WORD_LEN];
-    int fd, nread = 0, option = 0, no_input = 0, n_markets = 0, login_error;
+    int fd, nread = 0, option = 0, login_error;
 
     if(argc != 3){
         printf("Wrong number of arguments\n");
@@ -30,7 +30,7 @@ int main(int argc, char *argv[]){
 
     strcpy(server_addr, argv[1]);
     if ((hostPtr = gethostbyname(server_addr)) == 0)
-        erro("Can't obtain the address");
+        printf("Can't obtain the address\n");
 
     bzero((void *) &addr, sizeof(addr));
     addr.sin_family = AF_INET;
@@ -38,9 +38,9 @@ int main(int argc, char *argv[]){
     addr.sin_port = htons((short) atoi(argv[2]));
 
     if ((fd = socket(AF_INET,SOCK_STREAM,0)) == -1)
-        erro("socket");
+        printf("socket\n");
     if (connect(fd,(struct sockaddr *)&addr,sizeof (addr)) < 0)
-        erro("Connect");
+        printf("Connect\n");
 
     char password[WORD_LEN];
 

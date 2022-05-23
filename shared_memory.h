@@ -27,6 +27,9 @@ typedef struct{
 
 int create_shm(StockMarket markets[MAX_MARKETS_NUM], int num_markets);
 void close_shm();
+char* user_markets(const char* username);
+int log_in(const char* username, const char* password);
+int log_out(const char* username);
 char* print_users();
 void update_refresh_time(int refresh);
 int create_user(char *username, char *password, char markets[MAX_MARKETS_NUM][WORD_LEN], double balance, int num_markets);
