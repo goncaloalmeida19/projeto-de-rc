@@ -18,18 +18,20 @@
 
 #define WORD_LEN 50
 #define MSG_LEN WORD_LEN*20
-#define MAX_MARKET_NUM 2
+#define MAX_MARKETS_NUM 2
 
 pthread_t feed_thread;
 pthread_mutex_t markets_mutex = PTHREAD_MUTEX_INITIALIZER;
-char username[WORD_LEN], market1[WORD_LEN], market2[WORD_LEN];
-int n_markets, fd, feed_fd, SERVER_PORT;
+char username[WORD_LEN], market1[WORD_LEN], market2[WORD_LEN], ip[WORD_LEN];
+int n_markets, fd, feed_fd, SERVER_PORT, subs_markets[MAX_MARKETS_NUM];
+
 
 void set_n_markets(int n){
 	pthread_mutex_lock(&markets_mutex);
 	n_markets = n;
 	pthread_mutex_unlock(&markets_mutex);
 }
+
 
 int get_n_markets(){
 	pthread_mutex_lock(&markets_mutex);
@@ -42,7 +44,7 @@ int get_n_markets(){
 void* feed(){
 	int addr_len = sizeof(struct sockaddr_in);
 	char msg[4*MSG_LEN];
-	struct ip_mreq mreq[MAX_MARKET_NUM];
+	struct ip_mreq mreq[MAX_MARKETS_NUM];
 	struct sockaddr_in addr;
 	
 	feed_fd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -105,22 +107,108 @@ void* feed(){
 	pthread_exit(NULL);
 }
 
+
 void buy_share(){
-	printf("buy share\n");
+    char buffer[MSG_LEN], msg[MSG_LEN], stock[WORD_LEN];
+    int n_shares, nread, buy_error;
+    double price;
+	printf("Name of the stock you want to buy: ");
+    scanf("%s", stock);
+    printf("Number of shares you want to buy: ");
+    scanf("%d", &n_shares);
+    if (n_shares % 10 != 0){
+        printf("Number of shares invalid. Operation aborted.\n");
+    } else{
+        printf("Price of a share: ");
+        scanf("%lf", &price);
+
+        sprintf(msg, "buy %s %d %lf", stock, n_shares, price);
+        write(fd, msg, strlen(msg) + 1);
+
+        nread = read(fd, buffer, MSG_LEN-1);
+        if(nread <= 0){
+            printf("Server closed.\n");
+        } else{
+            if(sscanf(buffer, "buy 0 %d %lf", &n_shares, &price) == 1) {
+                printf("It was bought %d shares at the price %lf of the stock %s", n_shares, price, stock);
+            }
+            else if(sscanf(buffer, "buy %d", &buy_error) == 1) {
+                if(buy_error == 1)
+                    printf("The stock indicated is invalid.\n");
+                else if(buy_error == 2)
+                    printf("Operation refused. Buying price is lower than the selling price.\n");
+                else if(buy_error == 3)
+                    printf("Insufficient funds.\n");
+                else
+                    printf("Invalid command.\n");
+            }
+        }
+    }
 }
 
 
 void sell_share(){
-	printf("sell share\n");
+    char buffer[MSG_LEN], msg[MSG_LEN], stock[WORD_LEN];
+    int n_shares, nread, sell_error;
+    double price;
+    printf("Name of the stock you want to sell: ");
+    scanf("%s", stock);
+    printf("Number of shares you want to sell: ");
+    scanf("%d", &n_shares);
+    if (n_shares % 10 != 0){
+        printf("Number of shares invalid. Operation aborted.\n");
+    } else{
+        printf("Price of a share: ");
+        scanf("%lf", &price);
+
+        sprintf(msg, "sell %s %d %lf", stock, n_shares, price);
+        write(fd, msg, strlen(msg) + 1);
+
+        nread = read(fd, buffer, MSG_LEN-1);
+        if(nread <= 0){
+            printf("Server closed.\n");
+        } else{
+            if(sscanf(buffer, "sell 0 %d %lf", &n_shares, &price) == 1) {
+                printf("It was selled %d shares at the price %lf of the stock %s", n_shares, price, stock);
+            }
+            else if(sscanf(buffer, "sell %d", &sell_error) == 1) {
+                if(sell_error == 1)
+                    printf("The stock indicated is invalid.\n");
+                else if(sell_error == 2)
+                    printf("Operation refused. Selling price is higher than the buying price.\n");
+                else if(sell_error == 3)
+                    printf("Not sufficient shares in the wallet to sell.\n");
+                else
+                    printf("Invalid command.\n");
+            }
+        }
+    }
 }
+
 
 void turn_on_off_stock_update_feed(){
 	printf("turn_on_off_stock_update_feed\n");
 }
 
+
 void get_wallet_info(){
-	printf("get_wallet_info\n");
+    char buffer[MSG_LEN], msg[MSG_LEN], wallet_info[MSG_LEN];
+    int nread;
+
+    sprintf(msg, "wallet");
+    write(fd, msg, strlen(msg) + 1);
+
+    nread = read(fd, buffer, MSG_LEN-1);
+    if(nread <= 0){
+        printf("Server closed.\n");
+    } else{
+        if(sscanf(buffer, "wallet %s", wallet_info) == 1)
+            printf("%s", wallet_info);
+        else
+            printf("Invalid command.\n");
+    }
 }
+
 
 int login(char buffer[MSG_LEN], char msg[MSG_LEN]){
     int option = 0, login_error;
@@ -177,9 +265,10 @@ int login(char buffer[MSG_LEN], char msg[MSG_LEN]){
     }
 }
 
+
 void subscribe_markets(){
     char buffer[MSG_LEN], msg[MSG_LEN], market[WORD_LEN];
-    int option = 0, nread, subscribe_error;
+    int nread, subscribe_error, subs_idx;
     printf("Market name: ");
     scanf("%s", market);
 
@@ -190,11 +279,21 @@ void subscribe_markets(){
     if(nread <= 0){
         printf("Server closed.\n");
     } else{
-        if(sscanf(buffer, "subscribe 0 %s", market1) == 1) {
-            printf("Login successful! Client can access to the market %s.\n", market1);
+        if(sscanf(buffer, "subscribe 0 %s %d", ip, &subs_idx) == 1) {
+            printf("Market %s has been subscribed.\n", market);
+            subs_markets[subs_idx] = 1;
+        }
+        else if(sscanf(buffer, "subscribe %d", &subscribe_error) == 1) {
+            if(subscribe_error == 1)
+                printf("The indicated market does not exist.\n");
+            else if(subscribe_error == 2)
+                printf("The market cannot be subscribed because user does not have permission to subscribe it.\n");
+            else
+                printf("Invalid command.\n");
         }
     }
 }
+
 
 int menu(){
     int option = 0, b_s_option = 0, ver = 1;
@@ -247,6 +346,7 @@ int menu(){
     if (ver == -1) return -1;
     return 0;
 }
+
 
 int main(int argc, char *argv[]){
     struct hostent *hostPtr;
