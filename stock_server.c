@@ -12,9 +12,11 @@
 #include "shared_memory.h"
 
 #define MAX_USERS 5
+#define MARKET_GROUP_1 "239.0.0.1"
+#define MARKET_GROUP_2 "239.0.0.2"
 
 int user_count = 0, client_fds[MAX_USERS];
-pthread_t threads[MAX_USERS];
+pthread_t threads[MAX_USERS], feed_thread;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 void* server_thread(void *t){
@@ -24,8 +26,6 @@ void* server_thread(void *t){
 	//ask client for log in information
 	strcpy(msg, "asklogin"); 
 	write(fd, msg, strlen(msg)+1);
-	
-	
 	
 	while(1){
 		//receive client command
@@ -60,7 +60,48 @@ void* server_thread(void *t){
 		
 }
 
-int stock_server(const int PORTO_BOLSA){
+void* feed(){
+	int feed_fd, multicastTTL = 255;
+	char *msg_aux;
+	struct sockaddr_in markets[MAX_MARKETS_NUM];
+	bzero((void *) &markets[0], sizeof(markets[0]));
+  	markets[0].sin_family = AF_INET;
+  	markets[0].sin_addr.s_addr = inet_addr(MARKET_GROUP_1);
+  	markets[0].sin_port = htons(PORTO_BOLSA);
+  	if(total_num_markets == 2){
+		markets[1] = markets[0];
+		markets[1].sin_addr.s_addr = inet_addr(MARKET_GROUP_2);
+	}
+	
+	feed_fd = socket(AF_INET, SOCK_DGRAM, 0);
+	if (feed_fd < 0) {
+		perror("feed error: socket");
+		exit(1);
+	}
+
+	if (setsockopt(feed_fd, IPPROTO_IP, IP_MULTICAST_TTL, (void *) &multicastTTL, sizeof(multicastTTL)) < 0){
+		perror("feed error: sockopt");
+		exit(1);
+	}
+	
+	while(1){
+		for(int i = 0; i < total_num_markets; i++){
+			msg_aux = market_feed(i);
+			int cnt = sendto(feed_fd, msg_aux, 4*MSG_LEN, 0, (struct sockaddr *) &markets[i], sizeof(markets[i]));
+			printf("feed %d %s\n", i, msg_aux);
+			free(msg_aux);
+			if (cnt < 0) {
+				perror("feed error: sendto");
+				pthread_exit(NULL);
+			}
+		}
+		sleep(get_refresh_time());
+	}
+
+	pthread_exit(NULL);
+}
+
+int stock_server(){
 	char msg[MSG_LEN];
 	int fd, new_client, sockaddr_in_size;
 	struct sockaddr_in addr, new_client_addr;
@@ -81,8 +122,12 @@ int stock_server(const int PORTO_BOLSA){
 		printf("Stock Server: Listen error\n");
 		return -1;	
 	}
+	
+	pthread_create(&feed_thread, NULL, feed, NULL);
+	
   	sockaddr_in_size = sizeof(struct sockaddr_in);
 	while(1){
+		printf("accept\n");
 		new_client = accept(fd,(struct sockaddr *)&new_client_addr,(socklen_t *)&sockaddr_in_size);
 		if(new_client > 0){
 			if(user_count >= MAX_USERS){

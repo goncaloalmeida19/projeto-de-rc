@@ -25,10 +25,7 @@ typedef struct{
 ConfigData * file_data;
 
 void read_file(const char * FILE_NAME) {
-    int i, j, stocks_num[MAX_MARKETS_NUM], first_market = 1;
-	
-	
-    for (j = 0; j < MAX_MARKETS_NUM; j++) stocks_num[j] = 0;
+    int i, j, first_market = 1;
 
     double temp_stock_balance;
     char last_market[WORD_LEN], new_market[WORD_LEN], temp_stock_name[WORD_LEN];
@@ -37,6 +34,10 @@ void read_file(const char * FILE_NAME) {
     	printf("Error allocating memory for the config file data\n");
     	exit(1);
     }
+    
+    	
+    for (j = 0; j < MAX_MARKETS_NUM; j++) file_data->markets[j].stock_number = 0;
+    
     FILE *fp = fopen(FILE_NAME, "r");
 	
     if (fp != NULL) {
@@ -77,14 +78,14 @@ void read_file(const char * FILE_NAME) {
                     strcpy(file_data->markets[file_data->markets_num].name, new_market);
                     strcpy(last_market, new_market);
             }
-            strcpy(file_data->markets[file_data->markets_num].stocks[stocks_num[file_data->markets_num]].name, temp_stock_name);
-            file_data->markets[file_data->markets_num].stocks[stocks_num[file_data->markets_num]].balance = temp_stock_balance;
-            if (stocks_num[file_data->markets_num]++ > MAX_STOCKS_NUM){
+            strcpy(file_data->markets[file_data->markets_num].stocks[file_data->markets[file_data->markets_num].stock_number].name, temp_stock_name);
+            file_data->markets[file_data->markets_num].stocks[file_data->markets[file_data->markets_num].stock_number].buyer_price = temp_stock_balance;
+            if (++(file_data->markets[file_data->markets_num].stock_number) > MAX_STOCKS_NUM){
                 printf("Number of stocks in a market needs to be lower than 4\n");
                 exit(1);
-            } 
+            }
         }
-        file_data->markets_num++;
+        total_num_markets = ++(file_data->markets_num);
         fclose(fp);
     } else {
         free(file_data);
@@ -103,7 +104,7 @@ int main(int argc, char *argv[]) {
 	int i;
     printf("Server opened!\n");
     read_file(argv[3]);
-    if(create_shm(file_data->markets, file_data->markets_num) < 0){
+    if(create_shm(file_data->markets) < 0){
         exit(1);
     }
 
@@ -111,7 +112,8 @@ int main(int argc, char *argv[]) {
 		create_user(file_data->users[i].username, file_data->users[i].password, file_data->users[i].markets, file_data->users[i].balance, file_data->users[i].num_markets);
 	}
 	
-	if(stock_server(atoi(argv[1])) < 0){
+	PORTO_BOLSA = atoi(argv[1]);
+	if(stock_server() < 0){
 		exit(1);
 	}
 	

@@ -12,26 +12,33 @@ typedef struct{
     char username[WORD_LEN], password[WORD_LEN];
     double balance;
     char markets[MAX_MARKETS_NUM][WORD_LEN];
+    int shares[MAX_MARKETS_NUM][MAX_STOCKS_NUM];
     int num_markets, logged_in;
 } UserData;
 
 typedef struct{
     char name[WORD_LEN];
-    double balance;
+    int buyer_shares, seller_shares;
+    double buyer_price, seller_price;
 } StockData;
 
 typedef struct{
     char name[WORD_LEN];
     StockData stocks[MAX_STOCKS_NUM];
+    int stock_number;
 } StockMarket;
 
-int create_shm(StockMarket markets[MAX_MARKETS_NUM], int num_markets);
+int total_num_markets;
+
+int create_shm(StockMarket markets[MAX_MARKETS_NUM]);
 void close_shm();
 char* user_markets(const char* username);
 int log_in(const char* username, const char* password);
 int log_out(const char* username);
+char* market_feed(int market);
 char* print_users();
 void update_refresh_time(int refresh);
+int get_refresh_time();
 int create_user(char *username, char *password, char markets[MAX_MARKETS_NUM][WORD_LEN], double balance, int num_markets);
 int delete_user(char *username);
 

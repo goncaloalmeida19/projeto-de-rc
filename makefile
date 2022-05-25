@@ -17,7 +17,7 @@ ${PROG1}: ${OBJS1}
 		${CC} ${FLAGS} ${LIBS} ${OBJS1} -o $@
 
 ${PROG2}: ${OBJS2}
-		${CC} ${FLAGS} ${OBJS2} -o $@
+		${CC} ${FLAGS} ${LIBS} ${OBJS2} -o $@
 
 .c.o:
 		${CC} ${FLAGS} $< -c

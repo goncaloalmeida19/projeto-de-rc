@@ -11,7 +11,6 @@
 typedef struct{
     int users_len;
     int refresh_time;
-    int num_markets;
     UserData users[MAX_USERS_NUM];
     StockMarket markets[MAX_MARKETS_NUM];
 }SharedMemory;
@@ -28,7 +27,7 @@ int create_semaphore(){
     return 0;
 }
 
-int create_shm(StockMarket markets[MAX_MARKETS_NUM], int num_markets){
+int create_shm(StockMarket markets[MAX_MARKETS_NUM]){
     int i;
     
     //create shared memory
@@ -50,9 +49,8 @@ int create_shm(StockMarket markets[MAX_MARKETS_NUM], int num_markets){
 	
     shared_var->users_len = 0;
     shared_var->refresh_time = DEFAULT_REFRESH_TIME;
-    shared_var->num_markets = num_markets;
     //save markets
-    for(i = 0; i < num_markets; i++){
+    for(i = 0; i < total_num_markets; i++){
     	shared_var->markets[i] = markets[i];
     }
     
@@ -102,6 +100,18 @@ int log_out(const char* username){
     return user;
 }
 
+char* market_feed(int market){
+	sem_wait(shm_mutex);
+	char* msg = (char*)malloc(MSG_LEN*3), msg_aux[MSG_LEN];
+	sprintf(msg, "%s:", shared_var->markets[market].name);
+	for(int i = 0; i < shared_var->markets[market].stock_number; i++){
+		sprintf(msg_aux, "\n\t%s-\n\t\tBuyer price: %lf eur, Shares: %d\n\t\tSeller price: %lf eur, Shares: %d", shared_var->markets[market].stocks[i].name, shared_var->markets[market].stocks[i].buyer_price, shared_var->markets[market].stocks[i].buyer_shares, shared_var->markets[market].stocks[i].seller_price, shared_var->markets[market].stocks[i].seller_shares);
+		strcat(msg, msg_aux);
+	}
+	sem_post(shm_mutex);
+	return msg;
+}
+
 char* user_markets(const char* username){
 	sem_wait(shm_mutex);
 	int user = find_user(username, NULL);
@@ -115,6 +125,7 @@ char* user_markets(const char* username){
 		strcat(msg, " ");
 		strcat(msg, shared_var->users[user].markets[1]);
 	}
+	sem_post(shm_mutex);
 	return msg;	
 }
 
@@ -145,6 +156,13 @@ void update_refresh_time(int refresh){
 	sem_wait(shm_mutex);
     shared_var->refresh_time = refresh;
     sem_post(shm_mutex);
+}
+
+int get_refresh_time(){
+	sem_wait(shm_mutex);
+    int rt = shared_var->refresh_time;
+    sem_post(shm_mutex);
+    return rt;
 }
 
 int delete_user(char *username){
@@ -188,7 +206,7 @@ int create_user(char *username, char *password, char markets[MAX_MARKETS_NUM][WO
     //check if markets exist
     for(i = 0; i < num_markets; i++){
     	market_exists = 0;
-    	for(j = 0; j < shared_var->num_markets; j++){
+    	for(j = 0; j < total_num_markets; j++){
     		if(strcmp(markets[i], shared_var->markets[j].name) == 0){
     			market_exists = 1;
     			break;

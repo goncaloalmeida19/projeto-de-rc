@@ -8,6 +8,8 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
+#include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -16,9 +18,109 @@
 
 #define WORD_LEN 50
 #define MSG_LEN WORD_LEN*20
+#define MAX_MARKET_NUM 2
 
+pthread_t feed_thread;
+pthread_mutex_t markets_mutex = PTHREAD_MUTEX_INITIALIZER;
 char username[WORD_LEN], market1[WORD_LEN], market2[WORD_LEN];
-int n_markets, fd;
+int n_markets, fd, feed_fd, SERVER_PORT;
+
+void set_n_markets(int n){
+	pthread_mutex_lock(&markets_mutex);
+	n_markets = n;
+	pthread_mutex_unlock(&markets_mutex);
+}
+
+int get_n_markets(){
+	pthread_mutex_lock(&markets_mutex);
+	int n = n_markets;
+	pthread_mutex_unlock(&markets_mutex);
+	return n;
+}
+
+
+void* feed(){
+	int addr_len = sizeof(struct sockaddr_in);
+	char msg[4*MSG_LEN];
+	struct ip_mreq mreq[MAX_MARKET_NUM];
+	struct sockaddr_in addr;
+	
+	feed_fd = socket(AF_INET, SOCK_DGRAM, 0);
+	if (feed_fd < 0) {
+		perror("feed error: socket");
+		exit(1);
+	}
+	int multicastTTL = 255; // by default TTL=1; the packet is not transmitted to other networks
+	if (setsockopt(feed_fd, IPPROTO_IP, IP_MULTICAST_TTL, (void *) &multicastTTL, sizeof(multicastTTL)) < 0){
+		perror("feed error: socket opt");
+		exit(1);
+	}
+	
+	int reuseaddr = 1;
+	if (setsockopt(feed_fd, SOL_SOCKET, SO_REUSEADDR, (void *) &reuseaddr, sizeof(reuseaddr)) < 0){
+		perror("feed error: socket opt 2");
+		exit(1);
+	}
+	
+	bzero((void *) &addr, sizeof(addr));
+  	addr.sin_family = AF_INET;
+  	addr.sin_addr.s_addr = htonl(INADDR_ANY);
+  	addr.sin_port = htons(SERVER_PORT);
+
+	if (bind(feed_fd, (struct sockaddr *) &addr, addr_len) < 0) { 
+		perror("feed: bind");
+		exit(1);
+	} 
+	
+	//temporario
+	//para desativar basta por n_markets = 0
+	n_markets = 2;
+	mreq[0].imr_multiaddr.s_addr = inet_addr("239.0.0.1"); 
+	mreq[0].imr_interface.s_addr = htonl(INADDR_ANY); 
+	if (setsockopt(feed_fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq[0], sizeof(mreq[0])) < 0) {
+		perror("setsockopt mreq1");
+		exit(1);
+	} 
+	mreq[1].imr_multiaddr.s_addr = inet_addr("239.0.0.2"); 
+	mreq[1].imr_interface.s_addr = htonl(INADDR_ANY); 
+	if (setsockopt(feed_fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq[1], sizeof(mreq[1])) < 0) {
+		perror("setsockopt mreq2");
+		exit(1);
+	} 
+	//end temporario
+	
+	while (1) {
+		for(int i = 0; i < get_n_markets(); i++){
+			int cnt = recvfrom(feed_fd, msg, sizeof(msg), 0, (struct sockaddr *) &addr, (socklen_t *)&addr_len);
+			if (cnt < 0) {
+				perror("feed: recvfrom");
+				exit(1);
+			} else if (cnt == 0) {
+			break;
+			}
+			printf("feed: \"%s\"\n", msg);
+		}
+	}
+	printf("leave\n");
+	pthread_exit(NULL);
+}
+
+void buy_share(){
+	printf("buy share\n");
+}
+
+
+void sell_share(){
+	printf("sell share\n");
+}
+
+void turn_on_off_stock_update_feed(){
+	printf("turn_on_off_stock_update_feed\n");
+}
+
+void get_wallet_info(){
+	printf("get_wallet_info\n");
+}
 
 int login(char buffer[MSG_LEN], char msg[MSG_LEN]){
     int option = 0, login_error;
@@ -57,12 +159,12 @@ int login(char buffer[MSG_LEN], char msg[MSG_LEN]){
     }
     else if(sscanf(buffer, "login %s", market1) == 1) {
         printf("Login successful! Client can access to the market %s.\n", market1);
-        n_markets = 1;
+        set_n_markets(1);
         return 1;
     }
     else if(sscanf(buffer, "login %s %s", market1, market2) == 1) {
         printf("Login successful! Client can access to the markets %s and %s.\n", market1, market2);
-        n_markets = 2;
+        set_n_markets(2);
         return 1;
     }
     else if(strncmp(buffer, "login", 5) == 0) {
@@ -76,7 +178,7 @@ int login(char buffer[MSG_LEN], char msg[MSG_LEN]){
 }
 
 void subscribe_markets(){
-    char buffer[MSG_LEN], msg[MSG_LEN], market[MSG_LEN];
+    char buffer[MSG_LEN], msg[MSG_LEN], market[WORD_LEN];
     int option = 0, nread, subscribe_error;
     printf("Market name: ");
     scanf("%s", market);
@@ -96,6 +198,8 @@ void subscribe_markets(){
 
 int menu(){
     int option = 0, b_s_option = 0, ver = 1;
+    printf("markets %d\n", n_markets);
+    pthread_create(&feed_thread, NULL, feed, NULL);
     while(ver == 1) {
         printf("Menu:\n"
                "1 - Subscribe market\n"
@@ -104,6 +208,7 @@ int menu(){
                "4 - Wallet information\n"
                "5 - Close session\n"
                "Option: ");
+        fflush(stdout);
         scanf("%d", &option);
         switch (option) {
             case 1:
@@ -155,18 +260,21 @@ int main(int argc, char *argv[]){
     }
 
     strcpy(server_addr, argv[1]);
-    if ((hostPtr = gethostbyname(server_addr)) == 0)
-        printf("Can't obtain the address\n");
-
+    if((hostPtr = gethostbyname(server_addr)) == 0){
+        perror("Can't obtain the address");
+	}
+	
+	SERVER_PORT = atoi(argv[2]);
+	
     bzero((void *) &addr, sizeof(addr));
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = ((struct in_addr *)(hostPtr->h_addr))->s_addr;
-    addr.sin_port = htons((short) atoi(argv[2]));
+    addr.sin_port = htons((short) SERVER_PORT);
 
     if ((fd = socket(AF_INET,SOCK_STREAM,0)) == -1)
-        printf("socket\n");
+        perror("socket");
     if (connect(fd,(struct sockaddr *)&addr,sizeof (addr)) < 0)
-        printf("Connect\n");
+        perror("connect");
 
     do{
         // Receive message from server
