@@ -310,7 +310,7 @@ int menu(){
                "1 - Subscribe market\n"
                "2 - Buy/Sell shares\n"
                "3 - Turn on/off stocks update feed\n"
-               "4 - Wallet information\n"
+               "4 - Wallet and balance information\n"
                "5 - Close session\n"
                "Option: ");
         fflush(stdout);
