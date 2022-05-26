@@ -25,23 +25,8 @@ struct ip_mreq mreq[MAX_MARKETS_NUM];
 pthread_t feed_thread;
 pthread_mutex_t markets_mutex = PTHREAD_MUTEX_INITIALIZER, feed_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t markets_cond = PTHREAD_COND_INITIALIZER, feed_cond = PTHREAD_COND_INITIALIZER;
-int n_markets, fd, feed_fd[MAX_MARKETS_NUM], feed_id[MAX_MARKETS_NUM], SERVER_PORT, subs_markets[MAX_MARKETS_NUM], feed_on = 1;
-
-
-void set_n_markets(int n){
-	pthread_mutex_lock(&markets_mutex);
-	n_markets = n;
-	pthread_mutex_unlock(&markets_mutex);
-}
-
-
-int get_n_markets(){
-	pthread_mutex_lock(&markets_mutex);
-	int n = n_markets;
-	pthread_mutex_unlock(&markets_mutex);
-	return n;
-}
-
+int fd, feed_fd[MAX_MARKETS_NUM], feed_id[MAX_MARKETS_NUM], SERVER_PORT, subs_markets[MAX_MARKETS_NUM];
+int feed_on = 1;
 
 void* feed(void *t){
 	int id = *((int*)t);
