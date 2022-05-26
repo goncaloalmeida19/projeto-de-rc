@@ -99,7 +99,7 @@ void* feed(void *t){
 }
 
 
-void buy_share(){
+int buy_share(){
     char buffer[MSG_LEN], msg[MSG_LEN], stock[WORD_LEN];
     int n_shares, nread, buy_error;
     double price;
@@ -119,6 +119,7 @@ void buy_share(){
         nread = read(fd, buffer, MSG_LEN-1);
         if(nread <= 0){
             printf("Server closed.\n");
+            return -1;
         } else{
             if(sscanf(buffer, "buy 0 %d %lf", &n_shares, &price) == 2) {
                 printf("%d shares were bought at the price %lf of the stock %s\n", n_shares, price, stock);
@@ -137,10 +138,11 @@ void buy_share(){
             }
         }
     }
+    return 0;
 }
 
 
-void sell_share(){
+int sell_share(){
     char buffer[MSG_LEN], msg[MSG_LEN], stock[WORD_LEN];
     int n_shares, nread, sell_error;
     double price;
@@ -160,6 +162,7 @@ void sell_share(){
         nread = read(fd, buffer, MSG_LEN-1);
         if(nread <= 0){
             printf("Server closed.\n");
+            return -1;
         } else{
             if(sscanf(buffer, "sell 0 %d %lf", &n_shares, &price) == 2) {
                 printf("%d shares were sold at the price %lf of the stock %s\n", n_shares, price, stock);
@@ -178,6 +181,7 @@ void sell_share(){
             }
         }
     }
+    return 0;
 }
 
 
@@ -190,7 +194,7 @@ void turn_on_off_stock_update_feed(){
 }
 
 
-void get_wallet_info(){
+int get_wallet_info(){
     char buffer[MSG_LEN], msg[MSG_LEN], wallet_info[MSG_LEN];
     int nread;
 
@@ -200,12 +204,14 @@ void get_wallet_info(){
     nread = read(fd, buffer, MSG_LEN-1);
     if(nread <= 0){
         printf("Server closed.\n");
+        return -1;
     } else{
         if(sscanf(buffer, "wallet %[^#]", wallet_info) == 1)
             printf("%s", wallet_info);
         else
             printf("Invalid command.\n");
     }
+    return 0;
 }
 
 
@@ -263,7 +269,7 @@ int login(char buffer[MSG_LEN], char msg[MSG_LEN]){
 }
 
 
-void subscribe_markets(){
+int subscribe_markets(){
     char buffer[MSG_LEN], msg[MSG_LEN], market[WORD_LEN], ip[WORD_LEN];
     int nread, subscribe_error, subs_id;
     printf("Market name: ");
@@ -275,6 +281,7 @@ void subscribe_markets(){
     nread = read(fd, buffer, MSG_LEN-1);
     if(nread <= 0){
         printf("Server closed.\n");
+        return -1;
     } else{
         if(sscanf(buffer, "subscribe 0 %s %d", ip, &subs_id) == 2){
         	if(subs_markets[subs_id]){
@@ -296,6 +303,7 @@ void subscribe_markets(){
                 printf("Invalid command.\n");
         }else printf("Invalid command => %s\n", buffer);
     }
+    return 0;
 }
 
 
@@ -313,7 +321,7 @@ int menu(){
         scanf("%d", &option);
         switch (option) {
             case 1:
-                subscribe_markets();
+                if(subscribe_markets() == -1) ver = -1;
                 break;
             case 2:
                 printf("Menu:\n"
@@ -322,10 +330,12 @@ int menu(){
                        "3 - Go back\n"
                        "Option: ");
                 scanf("%d", &b_s_option);
-                if (b_s_option == 1)
-                    buy_share();
-                else if (b_s_option == 2)
-                    sell_share();
+                if (b_s_option == 1) {
+                    if (buy_share() == -1) ver = -1;
+                }
+                else if (b_s_option == 2) {
+                    if (sell_share() == -1) ver = -1;
+                }
                 else if (b_s_option == 3)
                     continue;
                 else
@@ -335,7 +345,7 @@ int menu(){
                 turn_on_off_stock_update_feed();
                 break;
             case 4:
-                get_wallet_info();
+                if(get_wallet_info() == -1) ver = -1;
                 break;
             case 5:
                 ver = -1;
@@ -391,7 +401,7 @@ int main(int argc, char *argv[]){
             login_return = login(buffer, msg);
         else
             if (menu() == -1)
-                login_return = 0;
+                login_return = -1;
 
         if(login_return == -1)
             break;
