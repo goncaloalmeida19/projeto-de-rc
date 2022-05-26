@@ -396,15 +396,20 @@ int main(int argc, char *argv[]){
         if (login_return != 1)
             login_return = login(buffer, msg);
         else
-            if (menu() == -1)
-                login_return = -1;
+            if (menu() == -1) {
+                printf("Server closed.\n");
+                break;
+            }
 
         if(login_return == -1)
             break;
         else if(login_return == 0 || login_return == 2) {
             continue;
         } else if(login_return == 1){
-            menu();
+            if (menu() == -1) {
+                printf("Server closed.\n");
+                break;
+            }
         }
     }while(1);
 	for(int i = 0; i < MAX_MARKETS_NUM; i++){
