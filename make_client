@@ -1,0 +1,23 @@
+CC = gcc
+FLAGS = -Wall
+LIBS = -pthread
+OBJS = operations_terminal.o
+PROG = operations_terminal
+
+# GENERIC
+
+all: ${PROG}
+
+clean:
+		rm ${OBJS} ${PROG}
+
+${PROG}: ${OBJS}
+		${CC} ${FLAGS} ${LIBS} ${OBJS} -o $@
+
+.c.o:
+		${CC} ${FLAGS} $< -c
+
+
+###############################################
+
+operations_terminal.o: operations_terminal.c operations_terminal.h
