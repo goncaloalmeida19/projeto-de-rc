@@ -100,16 +100,137 @@ int log_out(const char* username){
     return user;
 }
 
+int market_id(char* market){
+	for(int i = 0; i < total_num_markets; i++){
+		if(strcmp(market, shared_var->markets[i].name) == 0){
+			return i;
+		}
+	}
+	return -1;
+}
+
+int stock_id(char* stock, int* market){
+	for(int i = 0; i < total_num_markets; i++){
+		for(int j = 0; j < shared_var->markets[*market].stock_number; j++){
+			if(strcmp(stock, shared_var->markets[i].stocks[j].name) == 0){
+				*market = i;
+				sem_post(shm_mutex);
+				return j;
+			}
+		}
+	}
+	return -1;
+}
+
+int user_has_permissions(int user_id, int market_id){
+	for(int i = 0; i < shared_var->users[user_id].num_markets; i++)
+		if(strcmp(shared_var->users[user_id].markets[i], shared_var->markets[market_id].name) == 0)
+			return market_id;
+	return -2;
+}
+
+int subscribe_market(char* username, char* market){
+	sem_wait(shm_mutex);
+	int m_id = market_id(market);
+	if(m_id < 0){
+		sem_post(shm_mutex);
+		return -1;
+	}
+	int user_id = find_user(username, NULL);
+	if(user_id < 0){
+		printf("USER NOT FOUND\n");
+		sem_post(shm_mutex);
+		return -2;
+	} 
+	int result = user_has_permissions(user_id, m_id);
+	sem_post(shm_mutex);
+	return result;
+}
+
+void update_stock(int market, int i){
+	int seller_sh = (int)(((rand() % 2)-0.5)*2*10), buyer_sh = (int)(((rand() % 2)-0.5)*2*10);
+	double price_change = ((rand() % 2)-0.5)*2*0.01;
+	if(!(shared_var->markets[market].stocks[i].buyer_shares >= 100 && buyer_sh > 0) && !(shared_var->markets[market].stocks[i].buyer_shares <= 10 && buyer_sh < 0))
+		shared_var->markets[market].stocks[i].buyer_shares += buyer_sh;
+	if(!(shared_var->markets[market].stocks[i].seller_shares >= 100 && seller_sh > 0) && !(shared_var->markets[market].stocks[i].seller_shares <= 10 && seller_sh < 0))
+		shared_var->markets[market].stocks[i].seller_shares += seller_sh;
+	if(!(shared_var->markets[market].stocks[i].seller_price <= 0.01 && price_change < 0)){
+		shared_var->markets[market].stocks[i].buyer_price += price_change;
+		shared_var->markets[market].stocks[i].seller_price += price_change;
+	}
+}
+
 char* market_feed(int market){
 	sem_wait(shm_mutex);
-	char* msg = (char*)malloc(MSG_LEN*3), msg_aux[MSG_LEN];
+	char* msg = (char*)malloc(MSG_LEN*4), msg_aux[MSG_LEN];
 	sprintf(msg, "%s:", shared_var->markets[market].name);
 	for(int i = 0; i < shared_var->markets[market].stock_number; i++){
-		sprintf(msg_aux, "\n\t%s-\n\t\tBuyer price: %lf eur, Shares: %d\n\t\tSeller price: %lf eur, Shares: %d", shared_var->markets[market].stocks[i].name, shared_var->markets[market].stocks[i].buyer_price, shared_var->markets[market].stocks[i].buyer_shares, shared_var->markets[market].stocks[i].seller_price, shared_var->markets[market].stocks[i].seller_shares);
+		update_stock(market, i);
+		sprintf(msg_aux, "\n\t%s-\n\t\tBuyer price: %.2lf eur, Shares: %d\n\t\tSeller price: %.2lf eur, Shares: %d", shared_var->markets[market].stocks[i].name, shared_var->markets[market].stocks[i].buyer_price, shared_var->markets[market].stocks[i].buyer_shares, shared_var->markets[market].stocks[i].seller_price, shared_var->markets[market].stocks[i].seller_shares);
 		strcat(msg, msg_aux);
 	}
 	sem_post(shm_mutex);
 	return msg;
+}
+
+int buy_share(char* username, char* stock, int *shares, double *price){
+	sem_wait(shm_mutex);
+	int m_id, s_id, u_id = find_user(username, NULL);
+	if((s_id = stock_id(stock, &m_id)) < 0){
+		sem_post(shm_mutex);
+		return s_id;
+	}
+	if((m_id = user_has_permissions(u_id, m_id)) < 0){
+		sem_post(shm_mutex);
+		return m_id;
+	}
+	StockData *stk = &shared_var->markets[m_id].stocks[s_id];
+	if(*price < stk->seller_price){
+		sem_post(shm_mutex);
+		return -3;
+	}
+	if(shared_var->users[u_id].balance < stk->seller_price){
+		sem_post(shm_mutex);
+		return -4;
+	}
+	if(*shares > stk->seller_shares) *shares = stk->seller_shares;
+	if(*price > stk->seller_price) *price = stk->seller_price;
+	stk->seller_shares -= *shares;
+	shared_var->users[u_id].shares[m_id][s_id] += *shares;
+	shared_var->users[u_id].balance -= *price;
+	sem_post(shm_mutex);
+	return 0;
+}
+
+int sell_share(char* username, char* stock, int *shares, double *price){
+	sem_wait(shm_mutex);
+	int m_id, s_id, u_id = find_user(username, NULL);
+	if((s_id = stock_id(stock, &m_id)) < 0){
+		sem_post(shm_mutex);
+		return s_id;
+	}
+	if((m_id = user_has_permissions(u_id, m_id)) < 0){
+		sem_post(shm_mutex);
+		return m_id;
+	}
+	StockData *stk = &shared_var->markets[m_id].stocks[s_id];
+	if(*price > stk->buyer_price){
+		sem_post(shm_mutex);
+		return -3;
+	}
+	if(shared_var->users[u_id].shares[m_id][s_id] > 0){
+		sem_post(shm_mutex);
+		return -4;
+	}
+	
+	if(*shares > stk->buyer_shares) *shares = stk->buyer_shares;
+	if(*price < stk->buyer_price) *price = stk->buyer_price;
+	
+	stk->buyer_shares -= *shares;
+	shared_var->users[u_id].shares[m_id][s_id] -= *shares;
+	shared_var->users[u_id].balance += *price;
+	sem_post(shm_mutex);
+	return 0;
 }
 
 char* user_markets(const char* username){
@@ -231,7 +352,7 @@ int create_user(char *username, char *password, char markets[MAX_MARKETS_NUM][WO
     	shared_var->users_len++; // users_len is incremented by 1
     
     sem_post(shm_mutex);
-    
+    printf("%s\n", current_user->markets[0]);
     if(user_changed) return 1;
     
     return 0;

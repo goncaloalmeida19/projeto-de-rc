@@ -80,6 +80,9 @@ void read_file(const char * FILE_NAME) {
             }
             strcpy(file_data->markets[file_data->markets_num].stocks[file_data->markets[file_data->markets_num].stock_number].name, temp_stock_name);
             file_data->markets[file_data->markets_num].stocks[file_data->markets[file_data->markets_num].stock_number].buyer_price = temp_stock_balance;
+            file_data->markets[file_data->markets_num].stocks[file_data->markets[file_data->markets_num].stock_number].seller_price = temp_stock_balance-0.02;
+            file_data->markets[file_data->markets_num].stocks[file_data->markets[file_data->markets_num].stock_number].buyer_shares = ((rand()%10)+1)*10;
+            file_data->markets[file_data->markets_num].stocks[file_data->markets[file_data->markets_num].stock_number].seller_shares = ((rand()%10)+1)*10;
             if (++(file_data->markets[file_data->markets_num].stock_number) > MAX_STOCKS_NUM){
                 printf("Number of stocks in a market needs to be lower than 4\n");
                 exit(1);
@@ -112,16 +115,16 @@ int main(int argc, char *argv[]) {
 		create_user(file_data->users[i].username, file_data->users[i].password, file_data->users[i].markets, file_data->users[i].balance, file_data->users[i].num_markets);
 	}
 	
-	PORTO_BOLSA = atoi(argv[1]);
-	if(stock_server() < 0){
-		exit(1);
-	}
-	
     if(fork()==0){
     	if(admin_console(file_data->admin.username, file_data->admin.password, atoi(argv[2]))<0)
     		exit(1);
     	exit(0);
     }
+    
+    PORTO_BOLSA = atoi(argv[1]);
+	if(stock_server() < 0){
+		exit(1);
+	}
     
     wait(NULL);
     close_shm();

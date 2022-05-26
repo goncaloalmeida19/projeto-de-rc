@@ -12,16 +12,16 @@
 #include "shared_memory.h"
 
 #define MAX_USERS 5
-#define MARKET_GROUP_1 "239.0.0.1"
-#define MARKET_GROUP_2 "239.0.0.2"
+#define MARKET_BASE_GROUP "239.0.0."
 
 int user_count = 0, client_fds[MAX_USERS];
 pthread_t threads[MAX_USERS], feed_thread;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 void* server_thread(void *t){
-	int fd = *((int*)t), nread;
-	char msg[MSG_LEN], buffer[MSG_LEN], msg_aux1[MSG_LEN], msg_aux2[MSG_LEN], *msg_temp;
+	double price;
+	int fd = *((int*)t), nread, shares;
+	char msg[MSG_LEN], buffer[MSG_LEN], msg_aux1[MSG_LEN], msg_aux2[MSG_LEN], username[WORD_LEN], *msg_temp;
 	
 	//ask client for log in information
 	strcpy(msg, "asklogin"); 
@@ -49,12 +49,31 @@ void* server_thread(void *t){
 				write(fd, msg, strlen(msg)+1);
 				continue;
 			}
+			strcpy(username, msg_aux1);
 			sprintf(msg, "login %s", msg_temp);
-			write(fd, msg, strlen(msg)+1);
 			free(msg_temp);
-		} else {
-			printf("Wrong command => %s\n", msg);
 		}
+		else if(sscanf(buffer, "subscribe %s", msg_aux1) == 1){
+			int market = subscribe_market(username, msg_aux1);
+			if(market < 0) sprintf(msg, "subscribe %d", -market);
+			else sprintf(msg, "subscribe 0 %s%d %d", MARKET_BASE_GROUP, market+1, market);
+		}
+		else if(sscanf(buffer, "buy %s %d %lf", msg_aux1, &shares, &price) == 3){
+			int result = buy_share(username, msg_aux1, &shares, &price);
+			if(result < 0) sprintf(msg, "buy %d", -result);
+			else sprintf(msg, "buy 0 %d %lf", shares, price);
+		}
+		else if(sscanf(buffer, "sell %s %d %lf", msg_aux1, &shares, &price) == 3){
+			int result = buy_share(username, msg_aux1, &shares, &price);
+			if(result < 0) sprintf(msg, "sell %d", -result);
+			else sprintf(msg, "sell 0 %d %lf", shares, price);
+		}
+		else {
+			printf("Wrong command => %s\n", buffer);
+			continue;
+		}
+		printf("msg %s\n", msg);
+		write(fd, msg, strlen(msg)+1);
 	}
 	pthread_exit(NULL);
 		
@@ -62,17 +81,16 @@ void* server_thread(void *t){
 
 void* feed(){
 	int feed_fd, multicastTTL = 255;
-	char *msg_aux;
+	char *msg_aux, market_group[WORD_LEN];
 	struct sockaddr_in markets[MAX_MARKETS_NUM];
-	bzero((void *) &markets[0], sizeof(markets[0]));
-  	markets[0].sin_family = AF_INET;
-  	markets[0].sin_addr.s_addr = inet_addr(MARKET_GROUP_1);
-  	markets[0].sin_port = htons(PORTO_BOLSA);
-  	if(total_num_markets == 2){
-		markets[1] = markets[0];
-		markets[1].sin_addr.s_addr = inet_addr(MARKET_GROUP_2);
-	}
 	
+	for(int i = 0; i < total_num_markets; i++){
+		sprintf(market_group, "%s%d", MARKET_BASE_GROUP, i+1);
+		bzero((void *) &markets[i], sizeof(markets[i]));
+  		markets[i].sin_family = AF_INET;
+  		markets[i].sin_addr.s_addr = inet_addr(market_group);
+  		markets[i].sin_port = htons(PORTO_BOLSA+i);
+	}
 	feed_fd = socket(AF_INET, SOCK_DGRAM, 0);
 	if (feed_fd < 0) {
 		perror("feed error: socket");
@@ -81,6 +99,12 @@ void* feed(){
 
 	if (setsockopt(feed_fd, IPPROTO_IP, IP_MULTICAST_TTL, (void *) &multicastTTL, sizeof(multicastTTL)) < 0){
 		perror("feed error: sockopt");
+		exit(1);
+	}
+	
+	int reuseaddr = 1;
+	if (setsockopt(feed_fd, SOL_SOCKET, SO_REUSEADDR, (void *) &reuseaddr, sizeof(reuseaddr)) < 0){
+		perror("feed error: socket opt 2");
 		exit(1);
 	}
 	
@@ -114,6 +138,7 @@ int stock_server(){
 		printf("Stock Server: Error creating socket\n");
 		return -1;
 	}
+	
   	if ( bind(fd,(struct sockaddr*)&addr,sizeof(addr)) < 0){
 		printf("Stock Server: Bind error\n");
 		return -1;	

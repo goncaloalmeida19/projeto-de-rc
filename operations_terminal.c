@@ -20,10 +20,12 @@
 #define MSG_LEN WORD_LEN*20
 #define MAX_MARKETS_NUM 2
 
+struct ip_mreq mreq[MAX_MARKETS_NUM];
 pthread_t feed_thread;
-pthread_mutex_t markets_mutex = PTHREAD_MUTEX_INITIALIZER;
-char username[WORD_LEN], market1[WORD_LEN], market2[WORD_LEN], ip[WORD_LEN];
-int n_markets, fd, feed_fd, SERVER_PORT, subs_markets[MAX_MARKETS_NUM];
+pthread_mutex_t markets_mutex = PTHREAD_MUTEX_INITIALIZER, feed_mutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t markets_cond = PTHREAD_COND_INITIALIZER, feed_cond = PTHREAD_COND_INITIALIZER;
+char username[WORD_LEN], market1[WORD_LEN], market2[WORD_LEN];
+int n_markets, fd, feed_fd[MAX_MARKETS_NUM], feed_id[MAX_MARKETS_NUM], SERVER_PORT, subs_markets[MAX_MARKETS_NUM], feed_on = 1;
 
 
 void set_n_markets(int n){
@@ -41,25 +43,26 @@ int get_n_markets(){
 }
 
 
-void* feed(){
+void* feed(void *t){
+	int id = *((int*)t);
+
 	int addr_len = sizeof(struct sockaddr_in);
 	char msg[4*MSG_LEN];
-	struct ip_mreq mreq[MAX_MARKETS_NUM];
 	struct sockaddr_in addr;
 	
-	feed_fd = socket(AF_INET, SOCK_DGRAM, 0);
-	if (feed_fd < 0) {
+	feed_fd[id] = socket(AF_INET, SOCK_DGRAM, 0);
+	if (feed_fd[id] < 0) {
 		perror("feed error: socket");
 		exit(1);
 	}
 	int multicastTTL = 255; // by default TTL=1; the packet is not transmitted to other networks
-	if (setsockopt(feed_fd, IPPROTO_IP, IP_MULTICAST_TTL, (void *) &multicastTTL, sizeof(multicastTTL)) < 0){
+	if (setsockopt(feed_fd[id], IPPROTO_IP, IP_MULTICAST_TTL, (void *) &multicastTTL, sizeof(multicastTTL)) < 0){
 		perror("feed error: socket opt");
 		exit(1);
 	}
 	
 	int reuseaddr = 1;
-	if (setsockopt(feed_fd, SOL_SOCKET, SO_REUSEADDR, (void *) &reuseaddr, sizeof(reuseaddr)) < 0){
+	if (setsockopt(feed_fd[id], SOL_SOCKET, SO_REUSEADDR, (void *) &reuseaddr, sizeof(reuseaddr)) < 0){
 		perror("feed error: socket opt 2");
 		exit(1);
 	}
@@ -67,41 +70,43 @@ void* feed(){
 	bzero((void *) &addr, sizeof(addr));
   	addr.sin_family = AF_INET;
   	addr.sin_addr.s_addr = htonl(INADDR_ANY);
-  	addr.sin_port = htons(SERVER_PORT);
-
-	if (bind(feed_fd, (struct sockaddr *) &addr, addr_len) < 0) { 
+  	addr.sin_port = htons(SERVER_PORT+id);
+	
+	pthread_mutex_lock(&markets_mutex);
+	while(!subs_markets[id]){
+		pthread_cond_wait(&markets_cond, &markets_mutex);
+	}
+	pthread_mutex_unlock(&markets_mutex);
+	
+	if (bind(feed_fd[id], (struct sockaddr *) &addr, addr_len) < 0) { 
 		perror("feed: bind");
 		exit(1);
 	} 
 	
-	//temporario
-	//para desativar basta por n_markets = 0
-	n_markets = 2;
-	mreq[0].imr_multiaddr.s_addr = inet_addr("239.0.0.1"); 
-	mreq[0].imr_interface.s_addr = htonl(INADDR_ANY); 
-	if (setsockopt(feed_fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq[0], sizeof(mreq[0])) < 0) {
-		perror("setsockopt mreq1");
-		exit(1);
-	} 
-	mreq[1].imr_multiaddr.s_addr = inet_addr("239.0.0.2"); 
-	mreq[1].imr_interface.s_addr = htonl(INADDR_ANY); 
-	if (setsockopt(feed_fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq[1], sizeof(mreq[1])) < 0) {
-		perror("setsockopt mreq2");
-		exit(1);
-	} 
-	//end temporario
-	
 	while (1) {
-		for(int i = 0; i < get_n_markets(); i++){
-			int cnt = recvfrom(feed_fd, msg, sizeof(msg), 0, (struct sockaddr *) &addr, (socklen_t *)&addr_len);
-			if (cnt < 0) {
-				perror("feed: recvfrom");
-				exit(1);
-			} else if (cnt == 0) {
-			break;
-			}
-			printf("feed: \"%s\"\n", msg);
+		pthread_mutex_lock(&feed_mutex);
+		while(!feed_on){
+			pthread_cond_wait(&feed_cond, &feed_mutex);
 		}
+		pthread_mutex_unlock(&feed_mutex);
+		
+		int cnt = recvfrom(feed_fd[id], msg, sizeof(msg), 0, (struct sockaddr *) &addr, (socklen_t*)&addr_len);
+		
+		pthread_mutex_lock(&feed_mutex);
+		if(!feed_on){
+			pthread_mutex_unlock(&feed_mutex);
+			continue;
+		}
+		pthread_mutex_unlock(&feed_mutex);
+		
+		if (cnt < 0) {
+			perror("feed: recvfrom");
+			exit(1);
+		} else if (cnt == 0) {
+			break;
+		}
+		printf("feed%d: \"%s\"\n", id, msg);
+		
 	}
 	printf("leave\n");
 	pthread_exit(NULL);
@@ -119,7 +124,7 @@ void buy_share(){
     if (n_shares % 10 != 0){
         printf("Number of shares invalid. Operation aborted.\n");
     } else{
-        printf("Price of a share: ");
+        printf("Price of the share: ");
         scanf("%lf", &price);
 
         sprintf(msg, "buy %s %d %lf", stock, n_shares, price);
@@ -129,15 +134,17 @@ void buy_share(){
         if(nread <= 0){
             printf("Server closed.\n");
         } else{
-            if(sscanf(buffer, "buy 0 %d %lf", &n_shares, &price) == 1) {
-                printf("It was bought %d shares at the price %lf of the stock %s", n_shares, price, stock);
+            if(sscanf(buffer, "buy 0 %d %lf", &n_shares, &price) == 2) {
+                printf("%d shares were bought at the price %lf of the stock %s\n", n_shares, price, stock);
             }
             else if(sscanf(buffer, "buy %d", &buy_error) == 1) {
                 if(buy_error == 1)
                     printf("The stock indicated is invalid.\n");
                 else if(buy_error == 2)
-                    printf("Operation refused. Buying price is lower than the selling price.\n");
+                	printf("User doesn't have permissions to access that stock.\n");
                 else if(buy_error == 3)
+                    printf("Operation refused. Buying price is lower than the selling price.\n");
+                else if(buy_error == 4)
                     printf("Insufficient funds.\n");
                 else
                     printf("Invalid command.\n");
@@ -158,7 +165,7 @@ void sell_share(){
     if (n_shares % 10 != 0){
         printf("Number of shares invalid. Operation aborted.\n");
     } else{
-        printf("Price of a share: ");
+        printf("Price of the share: ");
         scanf("%lf", &price);
 
         sprintf(msg, "sell %s %d %lf", stock, n_shares, price);
@@ -168,15 +175,17 @@ void sell_share(){
         if(nread <= 0){
             printf("Server closed.\n");
         } else{
-            if(sscanf(buffer, "sell 0 %d %lf", &n_shares, &price) == 1) {
-                printf("It was selled %d shares at the price %lf of the stock %s", n_shares, price, stock);
+            if(sscanf(buffer, "sell 0 %d %lf", &n_shares, &price) == 2) {
+                printf("%d shares were sold at the price %lf of the stock %s\n", n_shares, price, stock);
             }
             else if(sscanf(buffer, "sell %d", &sell_error) == 1) {
                 if(sell_error == 1)
                     printf("The stock indicated is invalid.\n");
                 else if(sell_error == 2)
-                    printf("Operation refused. Selling price is higher than the buying price.\n");
+                	printf("User doesn't have permissions to access that stock.\n");
                 else if(sell_error == 3)
+                    printf("Operation refused. Selling price is higher than the buying price.\n");
+                else if(sell_error == 4)
                     printf("Not sufficient shares in the wallet to sell.\n");
                 else
                     printf("Invalid command.\n");
@@ -187,7 +196,11 @@ void sell_share(){
 
 
 void turn_on_off_stock_update_feed(){
-	printf("turn_on_off_stock_update_feed\n");
+	pthread_mutex_lock(&feed_mutex);
+	if(feed_on) feed_on = 0;
+	else feed_on = 1;
+	pthread_cond_broadcast(&feed_cond);
+	pthread_mutex_unlock(&feed_mutex);
 }
 
 
@@ -245,14 +258,14 @@ int login(char buffer[MSG_LEN], char msg[MSG_LEN]){
                 return 2;
         }
     }
+    else if(sscanf(buffer, "login %s %s", market1, market2) == 2) {
+        printf("Login successful! Client can access to the markets %s and %s.\n", market1, market2);
+        set_n_markets(2);
+        return 1;
+    }
     else if(sscanf(buffer, "login %s", market1) == 1) {
         printf("Login successful! Client can access to the market %s.\n", market1);
         set_n_markets(1);
-        return 1;
-    }
-    else if(sscanf(buffer, "login %s %s", market1, market2) == 1) {
-        printf("Login successful! Client can access to the markets %s and %s.\n", market1, market2);
-        set_n_markets(2);
         return 1;
     }
     else if(strncmp(buffer, "login", 5) == 0) {
@@ -267,8 +280,8 @@ int login(char buffer[MSG_LEN], char msg[MSG_LEN]){
 
 
 void subscribe_markets(){
-    char buffer[MSG_LEN], msg[MSG_LEN], market[WORD_LEN];
-    int nread, subscribe_error, subs_idx;
+    char buffer[MSG_LEN], msg[MSG_LEN], market[WORD_LEN], ip[WORD_LEN];
+    int nread, subscribe_error, subs_id;
     printf("Market name: ");
     scanf("%s", market);
 
@@ -279,9 +292,18 @@ void subscribe_markets(){
     if(nread <= 0){
         printf("Server closed.\n");
     } else{
-        if(sscanf(buffer, "subscribe 0 %s %d", ip, &subs_idx) == 1) {
-            printf("Market %s has been subscribed.\n", market);
-            subs_markets[subs_idx] = 1;
+        if(sscanf(buffer, "subscribe 0 %s %d", ip, &subs_id) == 2){
+            printf("Market %s has been subscribed. %d %s\n", market, subs_id, ip);
+            subs_markets[subs_id] = 1;
+            mreq[subs_id].imr_multiaddr.s_addr = inet_addr(ip); 
+			mreq[subs_id].imr_interface.s_addr = htonl(INADDR_ANY); 
+			if(setsockopt(feed_fd[subs_id], IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq[subs_id], sizeof(mreq[subs_id])) < 0){
+				perror("setsockopt mreq");
+				exit(1);
+			}
+			pthread_mutex_lock(&markets_mutex);
+			pthread_cond_broadcast(&markets_cond);
+			pthread_mutex_unlock(&markets_mutex);
         }
         else if(sscanf(buffer, "subscribe %d", &subscribe_error) == 1) {
             if(subscribe_error == 1)
@@ -290,7 +312,7 @@ void subscribe_markets(){
                 printf("The market cannot be subscribed because user does not have permission to subscribe it.\n");
             else
                 printf("Invalid command.\n");
-        }
+        }else printf("Invalid command => %s\n", buffer);
     }
 }
 
@@ -298,7 +320,10 @@ void subscribe_markets(){
 int menu(){
     int option = 0, b_s_option = 0, ver = 1;
     printf("markets %d\n", n_markets);
-    pthread_create(&feed_thread, NULL, feed, NULL);
+    for(int i = 0; i < MAX_MARKETS_NUM; i++){
+    	feed_id[i] = i;
+    	pthread_create(&feed_thread, NULL, feed, &feed_id[i]);
+    }
     while(ver == 1) {
         printf("Menu:\n"
                "1 - Subscribe market\n"

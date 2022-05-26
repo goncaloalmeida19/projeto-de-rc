@@ -150,7 +150,6 @@ int admin_console(char* admin_username, char* admin_password, const int PORTO_CO
 			break;
 		}
     }
-    
     // Fecha socket e termina programa
     close(s);
     return 0;
