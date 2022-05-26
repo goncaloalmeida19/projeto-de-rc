@@ -118,7 +118,6 @@ int buy_share(){
 
         nread = read(fd, buffer, MSG_LEN-1);
         if(nread <= 0){
-            printf("Server closed.\n");
             return -1;
         } else{
             if(sscanf(buffer, "buy 0 %d %lf", &n_shares, &price) == 2) {
@@ -161,7 +160,6 @@ int sell_share(){
 
         nread = read(fd, buffer, MSG_LEN-1);
         if(nread <= 0){
-            printf("Server closed.\n");
             return -1;
         } else{
             if(sscanf(buffer, "sell 0 %d %lf", &n_shares, &price) == 2) {
@@ -203,7 +201,6 @@ int get_wallet_info(){
 
     nread = read(fd, buffer, MSG_LEN-1);
     if(nread <= 0){
-        printf("Server closed.\n");
         return -1;
     } else{
         if(sscanf(buffer, "wallet %[^#]", wallet_info) == 1)
@@ -280,7 +277,6 @@ int subscribe_markets(){
 
     nread = read(fd, buffer, MSG_LEN-1);
     if(nread <= 0){
-        printf("Server closed.\n");
         return -1;
     } else{
         if(sscanf(buffer, "subscribe 0 %s %d", ip, &subs_id) == 2){
