@@ -25,7 +25,6 @@ struct ip_mreq mreq[MAX_MARKETS_NUM];
 pthread_t feed_thread;
 pthread_mutex_t markets_mutex = PTHREAD_MUTEX_INITIALIZER, feed_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t markets_cond = PTHREAD_COND_INITIALIZER, feed_cond = PTHREAD_COND_INITIALIZER;
-char username[WORD_LEN], market1[WORD_LEN], market2[WORD_LEN];
 int n_markets, fd, feed_fd[MAX_MARKETS_NUM], feed_id[MAX_MARKETS_NUM], SERVER_PORT, subs_markets[MAX_MARKETS_NUM], feed_on = 1;
 
 
@@ -226,7 +225,7 @@ void get_wallet_info(){
 
 int login(char buffer[MSG_LEN], char msg[MSG_LEN]){
     int option = 0, login_error;
-    char password[WORD_LEN];
+    char password[WORD_LEN], username[WORD_LEN], market1[WORD_LEN], market2[WORD_LEN];
 
     // Verify the content of the mensage sent by the server
     if(strcmp(buffer, "asklogin") == 0) {
