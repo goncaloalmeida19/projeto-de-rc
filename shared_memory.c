@@ -94,7 +94,7 @@ char* user_wallet(char* username){
 	}
 	
 	char* msg = (char*) malloc(MSG_LEN * sizeof(char)), msg_aux[WORD_LEN*2];
-	sprintf(msg, "Wallet for %s:\n\tBalance: %lf€\n\tOwned shares:\n", username, shared_var->users[user].balance);
+	sprintf(msg, "Wallet for %s:\n\tBalance: %.2lf€\n\tOwned shares:\n", username, shared_var->users[user].balance);
 	
 	for(int i = 0; i < total_num_markets; i++){
 		for(int j = 0; j < shared_var->markets[i].stock_number; j++){
@@ -134,7 +134,7 @@ int market_id(char* market){
 
 int stock_id(char* stock, int* market){
 	for(int i = 0; i < total_num_markets; i++){
-		for(int j = 0; j < shared_var->markets[*market].stock_number; j++){
+		for(int j = 0; j < shared_var->markets[i].stock_number; j++){
 			if(strcmp(stock, shared_var->markets[i].stocks[j].name) == 0){
 				*market = i;
 				sem_post(shm_mutex);
@@ -171,12 +171,12 @@ int subscribe_market(char* username, char* market){
 }
 
 void update_stock(int market, int i){
-	int seller_sh = (int)(((rand() % 2)-0.5)*2*10), buyer_sh = (int)(((rand() % 2)-0.5)*2*10);
+	//int seller_sh = (int)(((rand() % 2)-0.5)*2*10), buyer_sh = (int)(((rand() % 2)-0.5)*2*10);
 	double price_change = ((rand() % 2)-0.5)*2*0.01;
-	if(!(shared_var->markets[market].stocks[i].buyer_shares >= 100 && buyer_sh > 0) && !(shared_var->markets[market].stocks[i].buyer_shares <= 10 && buyer_sh < 0))
+	/*if(!(shared_var->markets[market].stocks[i].buyer_shares >= 100 && buyer_sh > 0) && !(shared_var->markets[market].stocks[i].buyer_shares <= 10 && buyer_sh < 0))
 		shared_var->markets[market].stocks[i].buyer_shares += buyer_sh;
 	if(!(shared_var->markets[market].stocks[i].seller_shares >= 100 && seller_sh > 0) && !(shared_var->markets[market].stocks[i].seller_shares <= 10 && seller_sh < 0))
-		shared_var->markets[market].stocks[i].seller_shares += seller_sh;
+		shared_var->markets[market].stocks[i].seller_shares += seller_sh;*/
 	if(!(shared_var->markets[market].stocks[i].seller_price <= 0.01 && price_change < 0)){
 		shared_var->markets[market].stocks[i].buyer_price += price_change;
 		shared_var->markets[market].stocks[i].seller_price += price_change;
@@ -220,7 +220,7 @@ int buy_share(char* username, char* stock, int *shares, double *price){
 	if(*price > stk->seller_price) *price = stk->seller_price;
 	stk->seller_shares -= *shares;
 	shared_var->users[u_id].shares[m_id][s_id] += *shares;
-	shared_var->users[u_id].balance -= *price;
+	shared_var->users[u_id].balance -= (*price) * (*shares);
 	sem_post(shm_mutex);
 	return 0;
 }
@@ -251,7 +251,7 @@ int sell_share(char* username, char* stock, int *shares, double *price){
 	
 	stk->buyer_shares -= *shares;
 	shared_var->users[u_id].shares[m_id][s_id] -= *shares;
-	shared_var->users[u_id].balance += *price;
+	shared_var->users[u_id].balance += (*price) * (*shares);
 	sem_post(shm_mutex);
 	return 0;
 }

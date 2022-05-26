@@ -35,7 +35,7 @@ void* server_thread(void *t){
 			pthread_exit(NULL);
 		}
 		buffer[nread] = '\0';
-		printf("%s\n", buffer);
+		//printf("%s\n", buffer);
 		if(sscanf(buffer, "login %s %s", msg_aux1, msg_aux2) == 2){
 			int result = log_in(msg_aux1, msg_aux2);
 			if(result < 0){
@@ -80,7 +80,7 @@ void* server_thread(void *t){
 			printf("Wrong command => %s\n", buffer);
 			continue;
 		}
-		printf("msg %s\n", msg);
+		//printf("msg %s\n", msg);
 		write(fd, msg, strlen(msg)+1);
 	}
 	pthread_exit(NULL);
@@ -120,7 +120,7 @@ void* feed(){
 		for(int i = 0; i < total_num_markets; i++){
 			msg_aux = market_feed(i);
 			int cnt = sendto(feed_fd, msg_aux, 4*MSG_LEN, 0, (struct sockaddr *) &markets[i], sizeof(markets[i]));
-			printf("feed %d %s\n", i, msg_aux);
+			//printf("feed %d %s\n", i, msg_aux);
 			free(msg_aux);
 			if (cnt < 0) {
 				perror("feed error: sendto");
@@ -160,7 +160,6 @@ int stock_server(){
 	
   	sockaddr_in_size = sizeof(struct sockaddr_in);
 	while(1){
-		printf("accept\n");
 		new_client = accept(fd,(struct sockaddr *)&new_client_addr,(socklen_t *)&sockaddr_in_size);
 		if(new_client > 0){
 			if(user_count >= MAX_USERS){
@@ -173,7 +172,5 @@ int stock_server(){
 			pthread_create(&threads[user_count], NULL, server_thread, &client_fds[user_count]);
 			user_count++;
 		}
-		pthread_join(threads[user_count-1], NULL);
-		sleep(1);
 	}
 }

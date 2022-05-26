@@ -20,4 +20,4 @@ ${PROG}: ${OBJS}
 
 ###############################################
 
-operations_terminal.o: operations_terminal.c operations_terminal.h
+operations_terminal.o: operations_terminal.c
