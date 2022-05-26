@@ -20,6 +20,7 @@
 #define MSG_LEN WORD_LEN*20
 #define MAX_MARKETS_NUM 2
 
+struct sockaddr_in addr[2];
 struct ip_mreq mreq[MAX_MARKETS_NUM];
 pthread_t feed_thread;
 pthread_mutex_t markets_mutex = PTHREAD_MUTEX_INITIALIZER, feed_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -48,7 +49,7 @@ void* feed(void *t){
 
 	int addr_len = sizeof(struct sockaddr_in);
 	char msg[4*MSG_LEN];
-	struct sockaddr_in addr;
+	
 	
 	feed_fd[id] = socket(AF_INET, SOCK_DGRAM, 0);
 	if (feed_fd[id] < 0) {
@@ -67,10 +68,9 @@ void* feed(void *t){
 		exit(1);
 	}
 	
-	bzero((void *) &addr, sizeof(addr));
-  	addr.sin_family = AF_INET;
-  	addr.sin_addr.s_addr = htonl(INADDR_ANY);
-  	addr.sin_port = htons(SERVER_PORT+id);
+	bzero((void *) &addr[id], sizeof(addr[id]));
+  	addr[id].sin_family = AF_INET;
+  	addr[id].sin_port = htons(SERVER_PORT);
 	
 	pthread_mutex_lock(&markets_mutex);
 	while(!subs_markets[id]){
@@ -78,7 +78,7 @@ void* feed(void *t){
 	}
 	pthread_mutex_unlock(&markets_mutex);
 	
-	if (bind(feed_fd[id], (struct sockaddr *) &addr, addr_len) < 0) { 
+	if (bind(feed_fd[id], (struct sockaddr *) &addr[id], addr_len) < 0) { 
 		perror("feed: bind");
 		exit(1);
 	} 
@@ -90,8 +90,8 @@ void* feed(void *t){
 		}
 		pthread_mutex_unlock(&feed_mutex);
 		
-		int cnt = recvfrom(feed_fd[id], msg, sizeof(msg), 0, (struct sockaddr *) &addr, (socklen_t*)&addr_len);
-		
+		int cnt = recvfrom(feed_fd[id], msg, sizeof(msg), 0, (struct sockaddr *) &addr[id], (socklen_t*)&addr_len);
+
 		pthread_mutex_lock(&feed_mutex);
 		if(!feed_on){
 			pthread_mutex_unlock(&feed_mutex);
@@ -105,8 +105,9 @@ void* feed(void *t){
 		} else if (cnt == 0) {
 			break;
 		}
+		pthread_mutex_lock(&feed_mutex);
 		printf("feed%d: \"%s\"\n", id, msg);
-		
+		pthread_mutex_unlock(&feed_mutex);
 	}
 	printf("leave\n");
 	pthread_exit(NULL);
@@ -215,7 +216,7 @@ void get_wallet_info(){
     if(nread <= 0){
         printf("Server closed.\n");
     } else{
-        if(sscanf(buffer, "wallet %s", wallet_info) == 1)
+        if(sscanf(buffer, "wallet %[^#]", wallet_info) == 1)
             printf("%s", wallet_info);
         else
             printf("Invalid command.\n");
@@ -296,7 +297,8 @@ void subscribe_markets(){
             printf("Market %s has been subscribed. %d %s\n", market, subs_id, ip);
             subs_markets[subs_id] = 1;
             mreq[subs_id].imr_multiaddr.s_addr = inet_addr(ip); 
-			mreq[subs_id].imr_interface.s_addr = htonl(INADDR_ANY); 
+			mreq[subs_id].imr_interface.s_addr = htonl(INADDR_ANY);
+			addr[subs_id].sin_addr.s_addr = inet_addr(ip);
 			if(setsockopt(feed_fd[subs_id], IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq[subs_id], sizeof(mreq[subs_id])) < 0){
 				perror("setsockopt mreq");
 				exit(1);
@@ -319,7 +321,6 @@ void subscribe_markets(){
 
 int menu(){
     int option = 0, b_s_option = 0, ver = 1;
-    printf("markets %d\n", n_markets);
     for(int i = 0; i < MAX_MARKETS_NUM; i++){
     	feed_id[i] = i;
     	pthread_create(&feed_thread, NULL, feed, &feed_id[i]);
@@ -375,7 +376,7 @@ int menu(){
 
 int main(int argc, char *argv[]){
     struct hostent *hostPtr;
-    struct sockaddr_in addr;
+    struct sockaddr_in addr_terminal;
     char server_addr[WORD_LEN], buffer[MSG_LEN], msg[MSG_LEN];
     int nread = 0, login_return = 0;
 
@@ -391,14 +392,14 @@ int main(int argc, char *argv[]){
 	
 	SERVER_PORT = atoi(argv[2]);
 	
-    bzero((void *) &addr, sizeof(addr));
-    addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = ((struct in_addr *)(hostPtr->h_addr))->s_addr;
-    addr.sin_port = htons((short) SERVER_PORT);
+    bzero((void *) &addr_terminal, sizeof(addr_terminal));
+    addr_terminal.sin_family = AF_INET;
+    addr_terminal.sin_addr.s_addr = ((struct in_addr *)(hostPtr->h_addr))->s_addr;
+    addr_terminal.sin_port = htons((short) SERVER_PORT);
 
     if ((fd = socket(AF_INET,SOCK_STREAM,0)) == -1)
         perror("socket");
-    if (connect(fd,(struct sockaddr *)&addr,sizeof (addr)) < 0)
+    if (connect(fd,(struct sockaddr *)&addr_terminal,sizeof (addr_terminal)) < 0)
         perror("connect");
 
     do{

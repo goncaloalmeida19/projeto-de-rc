@@ -68,6 +68,14 @@ void* server_thread(void *t){
 			if(result < 0) sprintf(msg, "sell %d", -result);
 			else sprintf(msg, "sell 0 %d %lf", shares, price);
 		}
+		else if(strcmp(buffer, "wallet") == 0){
+			msg_temp = user_wallet(username);
+			if(msg_temp == NULL) strcpy(msg, "internal_error");
+			else{
+				sprintf(msg, "wallet %s#", msg_temp);
+				free(msg_temp);
+			}
+		}
 		else {
 			printf("Wrong command => %s\n", buffer);
 			continue;
@@ -89,7 +97,7 @@ void* feed(){
 		bzero((void *) &markets[i], sizeof(markets[i]));
   		markets[i].sin_family = AF_INET;
   		markets[i].sin_addr.s_addr = inet_addr(market_group);
-  		markets[i].sin_port = htons(PORTO_BOLSA+i);
+  		markets[i].sin_port = htons(PORTO_BOLSA);
 	}
 	feed_fd = socket(AF_INET, SOCK_DGRAM, 0);
 	if (feed_fd < 0) {

@@ -85,6 +85,29 @@ int find_user(const char* username, const char* password){
     return -1;
 }
 
+char* user_wallet(char* username){
+	sem_wait(shm_mutex);
+	int user = find_user(username, NULL);
+	if(user < 0){
+		sem_post(shm_mutex);
+		return NULL;
+	}
+	
+	char* msg = (char*) malloc(MSG_LEN * sizeof(char)), msg_aux[WORD_LEN*2];
+	sprintf(msg, "Wallet for %s:\n\tBalance: %lf€\n\tOwned shares:\n", username, shared_var->users[user].balance);
+	
+	for(int i = 0; i < total_num_markets; i++){
+		for(int j = 0; j < shared_var->markets[i].stock_number; j++){
+			if(shared_var->users[user].shares[i][j] > 0){
+				sprintf(msg_aux, "\t\t%s: %d\n", shared_var->markets[i].stocks[j].name, shared_var->users[user].shares[i][j]);
+				strcat(msg, msg_aux);
+			}
+		}
+	}
+	
+    sem_post(shm_mutex);
+    return msg;
+}
 
 int log_in(const char* username, const char* password){
 	sem_wait(shm_mutex);
@@ -352,7 +375,6 @@ int create_user(char *username, char *password, char markets[MAX_MARKETS_NUM][WO
     	shared_var->users_len++; // users_len is incremented by 1
     
     sem_post(shm_mutex);
-    printf("%s\n", current_user->markets[0]);
     if(user_changed) return 1;
     
     return 0;

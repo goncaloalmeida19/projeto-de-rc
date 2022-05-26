@@ -38,6 +38,7 @@ int log_out(const char* username);
 int subscribe_market(char* username, char* market);
 int buy_share(char* username, char* stock, int *shares, double *price);
 int sell_share(char* username, char* stock, int *shares, double *price);
+char* user_wallet(char* username);
 char* market_feed(int market);
 char* print_users();
 void update_refresh_time(int refresh);
