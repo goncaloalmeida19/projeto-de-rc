@@ -387,31 +387,30 @@ int main(int argc, char *argv[]){
     do{
         // Receive message from server
         nread = read(fd, buffer, MSG_LEN-1);
-        if(nread <= 0){
-            printf("Server closed.\n");
+        if(nread <= 0)
             break;
-        }
+
         buffer[nread] = '\0';
 
         if (login_return != 1)
             login_return = login(buffer, msg);
         else
-            if (menu() == -1) {
-                printf("Server closed.\n");
+            if (menu() == -1)
                 break;
-            }
+
 
         if(login_return == -1)
             break;
         else if(login_return == 0 || login_return == 2) {
             continue;
         } else if(login_return == 1){
-            if (menu() == -1) {
-                printf("Server closed.\n");
+            if (menu() == -1)
                 break;
-            }
+
         }
     }while(1);
+    printf("Server closed.\n");
+
 	for(int i = 0; i < MAX_MARKETS_NUM; i++){
 		if(subs_markets[i]){
 			pthread_cancel(feed_thread[i]);
