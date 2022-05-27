@@ -11,6 +11,7 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 #include <stdlib.h>
+#include <signal.h>
 #include <string.h>
 #include <unistd.h>
 #include <netdb.h>
@@ -23,14 +24,33 @@
 pthread_t feed_thread[MAX_MARKETS_NUM];
 pthread_mutex_t feed_mutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_cond_t feed_cond = PTHREAD_COND_INITIALIZER;
+struct ip_mreq mreq[2];
 char ips[MAX_MARKETS_NUM][WORD_LEN];
 int fd, feed_fd[MAX_MARKETS_NUM], feed_id[MAX_MARKETS_NUM], SERVER_PORT, subs_markets[MAX_MARKETS_NUM];
 int feed_on = 1;
 
+void clean_resources(){
+	write(fd, "logout", 7);
+	//clean up resources used
+	for(int i = 0; i < MAX_MARKETS_NUM; i++){
+		if(subs_markets[i]){
+			//remove client from multicast group
+			setsockopt(feed_fd[i], IPPROTO_IP, IP_DROP_MEMBERSHIP, &mreq[i], sizeof(mreq[i]));
+			close(feed_fd[i]);
+		}
+	}
+    close(fd);
+}
+
+void sigint(int signum){
+	clean_resources();
+	printf("Console closing\n");
+	exit(0);
+}
+
 void* feed(void *t){
 	int id = *((int*)t), addr_len = sizeof(struct sockaddr_in);
 	struct sockaddr_in addr;
-	struct ip_mreq mreq;
 	char msg[4*MSG_LEN];
 	
 	
@@ -50,15 +70,15 @@ void* feed(void *t){
 		perror("feed error: socket opt 2");
 		exit(1);
 	}
-	
 	bzero((void *) &addr, sizeof(addr));
   	addr.sin_family = AF_INET;
   	addr.sin_port = htons(SERVER_PORT);
   	addr.sin_addr.s_addr = inet_addr(ips[id]);
-	mreq.imr_multiaddr.s_addr = inet_addr(ips[id]); 
-	mreq.imr_interface.s_addr = htonl(INADDR_ANY);
+	mreq[id].imr_multiaddr.s_addr = inet_addr(ips[id]); 
+	mreq[id].imr_interface.s_addr = htonl(INADDR_ANY);
 	
-	if(setsockopt(feed_fd[id], IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0){
+	//subscribe multicast group responsible for the market
+	if(setsockopt(feed_fd[id], IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq[id], sizeof(mreq[id])) < 0){
 		perror("setsockopt mreq");
 		exit(1);
 	}
@@ -71,6 +91,7 @@ void* feed(void *t){
 	while (1) {
 		pthread_mutex_lock(&feed_mutex);
 		while(!feed_on){
+			//wait until feed is turned back on
 			pthread_cond_wait(&feed_cond, &feed_mutex);
 		}
 		pthread_mutex_unlock(&feed_mutex);
@@ -90,11 +111,12 @@ void* feed(void *t){
 		} else if (cnt == 0) {
 			break;
 		}
+		//print feed
 		pthread_mutex_lock(&feed_mutex);
-		printf("feed%d: \"%s\"\n", id, msg);
+		printf("feed: \"%s\"\n", msg);
 		pthread_mutex_unlock(&feed_mutex);
 	}
-	printf("leave\n");
+	raise(SIGINT);
 	pthread_exit(NULL);
 }
 
@@ -184,6 +206,7 @@ int sell_share(){
 
 
 void turn_on_off_stock_update_feed(){
+	//switch feed state and notify feed threads
 	pthread_mutex_lock(&feed_mutex);
 	if(feed_on) feed_on = 0;
 	else feed_on = 1;
@@ -224,11 +247,17 @@ int login(char buffer[MSG_LEN], char msg[MSG_LEN]){
         write(fd, msg, strlen(msg) + 1);
         return 0;
     }
+    else if(strcmp(buffer, "userlimit") == 0){
+    	printf("Connection refused: limit number of users reached\n");
+    	return 2;
+    }
     else if(sscanf(buffer, "login %d", &login_error) == 1) {
         if (login_error == 1) {
             printf("Username not found.\n");
-        } else {
+        } else if(login_error == 2){
             printf("Wrong Password.\n");
+        } else if(login_error == 3){
+        	printf("User already logged in\n");
         }
         printf("1 - Try again\n2 - Close console\nOption: \n");
         scanf("%d", &option);
@@ -284,6 +313,8 @@ int subscribe_markets(){
         		printf("Market %s has already been subscribed.\n", market);
         	}else{
             	printf("Market %s has been subscribed\n", market);
+            	
+            	//New market has been subscribed, create a new thread to receive its feed
             	subs_markets[subs_id] = 1;
             	strcpy(ips[subs_id], ip);
 				feed_id[subs_id] = subs_id;
@@ -344,6 +375,7 @@ int menu(){
                 if(get_wallet_info() == -1) ver = -1;
                 break;
             case 5:
+    			write(fd, "logout", 7);
                 ver = -1;
                 break;
             default:
@@ -366,7 +398,9 @@ int main(int argc, char *argv[]){
         printf("Wrong number of arguments\n");
         exit(1);
     }
-
+	
+	signal(SIGINT, sigint);
+	
     strcpy(server_addr, argv[1]);
     if((hostPtr = gethostbyname(server_addr)) == 0){
         perror("Can't obtain the address");
@@ -409,15 +443,7 @@ int main(int argc, char *argv[]){
 
         }
     }while(1);
-    printf("Server closed.\n");
 
-	for(int i = 0; i < MAX_MARKETS_NUM; i++){
-		if(subs_markets[i]){
-			pthread_cancel(feed_thread[i]);
-			pthread_join(feed_thread[i], NULL);
-			close(feed_fd[i]);
-		}
-	}
-    close(fd);
+	clean_resources();
     return 0;
 }

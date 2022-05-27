@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <signal.h>
 #include <pthread.h>
 #include <sys/wait.h>
 #include <sys/socket.h>
@@ -14,9 +15,26 @@
 #define MAX_USERS 5
 #define MARKET_BASE_GROUP "239.0.0."
 
-int user_count = 0, client_fds[MAX_USERS];
+int user_count = 0, client_fds[MAX_USERS], server_fd, feed_fd;
 pthread_t threads[MAX_USERS], feed_thread;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
+
+void clean_resources(){
+	//kill admin console
+	kill(admin_console_pid, SIGINT);
+	wait(NULL);
+	//clean other resources
+	close_shm();
+	close(server_fd);
+	close(feed_fd);
+	for(int i = 0; i < user_count; i++) close(client_fds[i]);
+}
+
+void sigint(int signum){
+	clean_resources();
+	printf("Server closed!\n");
+    exit(0);
+}
 
 void* server_thread(void *t){
 	double price;
@@ -35,7 +53,6 @@ void* server_thread(void *t){
 			pthread_exit(NULL);
 		}
 		buffer[nread] = '\0';
-		//printf("%s\n", buffer);
 		if(sscanf(buffer, "login %s %s", msg_aux1, msg_aux2) == 2){
 			int result = log_in(msg_aux1, msg_aux2);
 			if(result < 0){
@@ -53,6 +70,10 @@ void* server_thread(void *t){
 			sprintf(msg, "login %s", msg_temp);
 			free(msg_temp);
 		}
+		else if(strcmp(buffer, "logout") == 0){
+			log_out(username);
+			continue;
+		}
 		else if(sscanf(buffer, "subscribe %s", msg_aux1) == 1){
 			int market = subscribe_market(username, msg_aux1);
 			if(market < 0) sprintf(msg, "subscribe %d", -market);
@@ -64,7 +85,7 @@ void* server_thread(void *t){
 			else sprintf(msg, "buy 0 %d %lf", shares, price);
 		}
 		else if(sscanf(buffer, "sell %s %d %lf", msg_aux1, &shares, &price) == 3){
-			int result = buy_share(username, msg_aux1, &shares, &price);
+			int result = sell_share(username, msg_aux1, &shares, &price);
 			if(result < 0) sprintf(msg, "sell %d", -result);
 			else sprintf(msg, "sell 0 %d %lf", shares, price);
 		}
@@ -80,7 +101,6 @@ void* server_thread(void *t){
 			printf("Wrong command => %s\n", buffer);
 			continue;
 		}
-		//printf("msg %s\n", msg);
 		write(fd, msg, strlen(msg)+1);
 	}
 	pthread_exit(NULL);
@@ -88,11 +108,13 @@ void* server_thread(void *t){
 }
 
 void* feed(){
-	int feed_fd, multicastTTL = 255;
+	int multicastTTL = 255;
 	char *msg_aux, market_group[WORD_LEN];
 	struct sockaddr_in markets[MAX_MARKETS_NUM];
 	
+	//setup a multicast group for each market
 	for(int i = 0; i < total_num_markets; i++){
+		//address is 239.0.0.(i+1)
 		sprintf(market_group, "%s%d", MARKET_BASE_GROUP, i+1);
 		bzero((void *) &markets[i], sizeof(markets[i]));
   		markets[i].sin_family = AF_INET;
@@ -116,11 +138,11 @@ void* feed(){
 		exit(1);
 	}
 	
+	//send each market feed to its respective multicast group every REFRESH_TIME seconds
 	while(1){
 		for(int i = 0; i < total_num_markets; i++){
 			msg_aux = market_feed(i);
 			int cnt = sendto(feed_fd, msg_aux, 4*MSG_LEN, 0, (struct sockaddr *) &markets[i], sizeof(markets[i]));
-			//printf("feed %d %s\n", i, msg_aux);
 			free(msg_aux);
 			if (cnt < 0) {
 				perror("feed error: sendto");
@@ -135,23 +157,26 @@ void* feed(){
 
 int stock_server(){
 	char msg[MSG_LEN];
-	int fd, new_client, sockaddr_in_size;
+	int new_client, sockaddr_in_size;
 	struct sockaddr_in addr, new_client_addr;
 	bzero((void *) &addr, sizeof(addr));
   	addr.sin_family = AF_INET;
   	addr.sin_addr.s_addr = htonl(INADDR_ANY);
   	addr.sin_port = htons(PORTO_BOLSA);
   	
-  	if ( (fd = socket(AF_INET, SOCK_STREAM, 0)) < 0){
+  	//redirect SIGINT
+    signal(SIGINT, sigint);
+  	
+  	if ( (server_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0){
 		printf("Stock Server: Error creating socket\n");
 		return -1;
 	}
 	
-  	if ( bind(fd,(struct sockaddr*)&addr,sizeof(addr)) < 0){
+  	if ( bind(server_fd,(struct sockaddr*)&addr,sizeof(addr)) < 0){
 		printf("Stock Server: Bind error\n");
 		return -1;	
 	}
-  	if( listen(fd, MAX_USERS) < 0){
+  	if( listen(server_fd, MAX_USERS) < 0){
 		printf("Stock Server: Listen error\n");
 		return -1;	
 	}
@@ -159,8 +184,9 @@ int stock_server(){
 	pthread_create(&feed_thread, NULL, feed, NULL);
 	
   	sockaddr_in_size = sizeof(struct sockaddr_in);
+  	//accept multiple clients
 	while(1){
-		new_client = accept(fd,(struct sockaddr *)&new_client_addr,(socklen_t *)&sockaddr_in_size);
+		new_client = accept(server_fd,(struct sockaddr *)&new_client_addr,(socklen_t *)&sockaddr_in_size);
 		if(new_client > 0){
 			if(user_count >= MAX_USERS){
 				strcpy(msg, "userlimit"); 

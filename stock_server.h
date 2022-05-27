@@ -4,5 +4,6 @@
 int stock_server();
 
 int PORTO_BOLSA;
+pid_t admin_console_pid;
 
 #endif

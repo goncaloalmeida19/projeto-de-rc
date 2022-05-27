@@ -1,11 +1,25 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <signal.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>
 #include "shared_memory.h"
+
+int s;
+
+void clean_ac_resources(){
+	//close server
+	kill(getppid(), SIGINT);
+	close(s);
+}
+
+void sigint_ac(int signum){
+	clean_ac_resources();
+	exit(0);
+}
 
 void sockaddr_in_copy(struct sockaddr_in *new, struct sockaddr_in *old){
 	new->sin_family = old->sin_family;
@@ -20,10 +34,13 @@ int compare_sockaddr_in(struct sockaddr_in *si1, struct sockaddr_in *si2){
 int admin_console(char* admin_username, char* admin_password, const int PORTO_CONFIG){
 	struct sockaddr_in si_server, si_admin, si_admin_copy;
     socklen_t slen = sizeof(struct sockaddr_in);
-    int s, recv_len, quit_server = 0, quit_console = 0, refresh;
+    int recv_len, quit_server = 0, quit_console = 0, refresh;
     double balance;
     char buf[MSG_LEN], msg[2*MSG_LEN], username[WORD_LEN], password[WORD_LEN], market[WORD_LEN], market2[WORD_LEN], markets[MAX_MARKETS_NUM][WORD_LEN];
-    
+    	
+    //redirect SIGINT
+    signal(SIGINT, sigint_ac);
+    	
 	// Create socket to receive UDP packets
     if((s=socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP)) == -1) {
         printf("Error creating socket\n");
@@ -150,8 +167,8 @@ int admin_console(char* admin_username, char* admin_password, const int PORTO_CO
 			break;
 		}
     }
-    // Fecha socket e termina programa
-    close(s);
+
+    clean_ac_resources();
     return 0;
 
 }
