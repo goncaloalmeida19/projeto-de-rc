@@ -81,8 +81,8 @@ void read_file(const char * FILE_NAME) {
             }
             //store current stock data 
             strcpy(file_data->markets[file_data->markets_num].stocks[file_data->markets[file_data->markets_num].stock_number].name, temp_stock_name);
-            file_data->markets[file_data->markets_num].stocks[file_data->markets[file_data->markets_num].stock_number].buyer_price = temp_stock_balance;
-            file_data->markets[file_data->markets_num].stocks[file_data->markets[file_data->markets_num].stock_number].seller_price = temp_stock_balance-0.02;
+            file_data->markets[file_data->markets_num].stocks[file_data->markets[file_data->markets_num].stock_number].seller_price = temp_stock_balance;
+            file_data->markets[file_data->markets_num].stocks[file_data->markets[file_data->markets_num].stock_number].buyer_price = temp_stock_balance-0.02;
             file_data->markets[file_data->markets_num].stocks[file_data->markets[file_data->markets_num].stock_number].buyer_shares = ((rand()%10)+1)*10;
             file_data->markets[file_data->markets_num].stocks[file_data->markets[file_data->markets_num].stock_number].seller_shares = ((rand()%10)+1)*10;
             if (++(file_data->markets[file_data->markets_num].stock_number) > MAX_STOCKS_NUM){

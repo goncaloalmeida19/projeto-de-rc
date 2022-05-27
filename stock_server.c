@@ -13,10 +13,11 @@
 #include "shared_memory.h"
 
 #define MAX_USERS 5
+#define MAX_TOTAL_USERS 100
 #define MARKET_BASE_GROUP "239.0.0."
 
-int user_count = 0, client_fds[MAX_USERS], server_fd, feed_fd;
-pthread_t threads[MAX_USERS], feed_thread;
+int user_count = 0, total_user_count = 0, client_fds[MAX_TOTAL_USERS], server_fd, feed_fd;
+pthread_t threads[MAX_TOTAL_USERS], feed_thread;
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 void clean_resources(){
@@ -27,7 +28,7 @@ void clean_resources(){
 	close_shm();
 	close(server_fd);
 	close(feed_fd);
-	for(int i = 0; i < user_count; i++) close(client_fds[i]);
+	for(int i = 0; i < total_user_count; i++) close(client_fds[i]);
 }
 
 void sigint(int signum){
@@ -49,6 +50,7 @@ void* server_thread(void *t){
 		//receive client command
 		nread = read(fd, buffer, MSG_LEN-1);
 		if(nread <= 0){
+			user_count--;
 			close(fd);
 			pthread_exit(NULL);
 		}
@@ -103,6 +105,8 @@ void* server_thread(void *t){
 		}
 		write(fd, msg, strlen(msg)+1);
 	}
+	user_count--;
+	close(fd);
 	pthread_exit(NULL);
 		
 }
@@ -194,9 +198,10 @@ int stock_server(){
 				close(new_client);
 				continue;
 			}
-			client_fds[user_count] = new_client;
-			pthread_create(&threads[user_count], NULL, server_thread, &client_fds[user_count]);
+			client_fds[total_user_count] = new_client;
+			pthread_create(&threads[total_user_count], NULL, server_thread, &client_fds[total_user_count]);
 			user_count++;
+			total_user_count++;
 		}
 	}
 }

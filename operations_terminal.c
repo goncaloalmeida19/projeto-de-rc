@@ -134,30 +134,37 @@ int buy_share(){
     } else{
         printf("Price of the share: ");
         scanf("%lf", &price);
-
-        sprintf(msg, "buy %s %d %lf", stock, n_shares, price);
-        write(fd, msg, strlen(msg) + 1);
-
-        nread = read(fd, buffer, MSG_LEN-1);
-        if(nread <= 0){
-            return -1;
-        } else{
-            if(sscanf(buffer, "buy 0 %d %lf", &n_shares, &price) == 2) {
-                printf("%d shares were bought at the price %lf of the stock %s\n", n_shares, price, stock);
-            }
-            else if(sscanf(buffer, "buy %d", &buy_error) == 1) {
-                if(buy_error == 1)
-                    printf("Invalid stock.\n");
-                else if(buy_error == 2)
-                	printf("User doesn't have permissions to access that stock.\n");
-                else if(buy_error == 3)
-                    printf("Operation refused. Buying price is lower than the selling price.\n");
-                else if(buy_error == 4)
-                    printf("Insufficient funds.\n");
-                else
-                    printf("Invalid command.\n");
-            }
-        }
+		
+		if (price <= 0){
+        	printf("Invalid price. Operation aborted.\n");
+    	}else{
+        	sprintf(msg, "buy %s %d %lf", stock, n_shares, price);
+        	write(fd, msg, strlen(msg) + 1);
+	
+        	nread = read(fd, buffer, MSG_LEN-1);
+        	if(nread <= 0){
+            	return -1;
+        	} else{
+            	if(sscanf(buffer, "buy 0 %d %lf", &n_shares, &price) == 2) {
+                	if(n_shares == 0)
+            			printf("No shares were bought because there are no sellers\n");
+            		else
+                		printf("%d shares were bought at the price %lf of the stock %s\n", n_shares, price, stock);
+            	}
+            	else if(sscanf(buffer, "buy %d", &buy_error) == 1) {
+                	if(buy_error == 1)
+                    	printf("Invalid stock.\n");
+                	else if(buy_error == 2)
+                		printf("User doesn't have permissions to access that stock.\n");
+                	else if(buy_error == 3)
+                    	printf("Operation refused. Buying price is lower than the selling price.\n");
+                	else if(buy_error == 4)
+                    	printf("Insufficient funds.\n");
+                	else
+                    	printf("Invalid command.\n");
+            	}
+        	}
+       	}
     }
     return 0;
 }
@@ -176,29 +183,35 @@ int sell_share(){
     } else{
         printf("Price of the share: ");
         scanf("%lf", &price);
-
-        sprintf(msg, "sell %s %d %lf", stock, n_shares, price);
-        write(fd, msg, strlen(msg) + 1);
-
-        nread = read(fd, buffer, MSG_LEN-1);
-        if(nread <= 0){
-            return -1;
-        } else{
-            if(sscanf(buffer, "sell 0 %d %lf", &n_shares, &price) == 2) {
-                printf("%d shares were sold at the price %lf of the stock %s\n", n_shares, price, stock);
-            }
-            else if(sscanf(buffer, "sell %d", &sell_error) == 1) {
-                if(sell_error == 1)
-                    printf("Invalid stock.\n");
-                else if(sell_error == 2)
-                	printf("User doesn't have permissions to access that stock.\n");
-                else if(sell_error == 3)
-                    printf("Operation refused. Selling price is higher than the buying price.\n");
-                else if(sell_error == 4)
-                    printf("Not enough shares in the wallet to sell.\n");
-                else
-                    printf("Invalid command.\n");
-            }
+		if (price <= 0){
+        	printf("Invalid price. Operation aborted.\n");
+    	}else{
+        	sprintf(msg, "sell %s %d %lf", stock, n_shares, price);
+        	write(fd, msg, strlen(msg) + 1);
+	
+        	nread = read(fd, buffer, MSG_LEN-1);
+        	if(nread <= 0){
+            	return -1;
+        	} else{
+            	if(sscanf(buffer, "sell 0 %d %lf", &n_shares, &price) == 2) {
+            		if(n_shares == 0)
+            			printf("No shares were sold because there are no buyers\n");
+            		else
+                		printf("%d shares were sold at the price %lf of the stock %s\n", n_shares, price, stock);
+            	}
+            	else if(sscanf(buffer, "sell %d", &sell_error) == 1) {
+                	if(sell_error == 1)
+                    	printf("Invalid stock.\n");
+                	else if(sell_error == 2)
+                		printf("User doesn't have permissions to access that stock.\n");
+                	else if(sell_error == 3)
+                    	printf("Operation refused. Selling price is higher than the buying price.\n");
+                	else if(sell_error == 4)
+                    	printf("Not enough shares in the wallet to sell.\n");
+                	else
+                    	printf("Invalid command.\n");
+            	}
+        	}
         }
     }
     return 0;
@@ -433,9 +446,9 @@ int main(int argc, char *argv[]){
                 break;
 
 
-        if(login_return == -1)
+        if(login_return == -1 || login_return == 2)
             break;
-        else if(login_return == 0 || login_return == 2) {
+        else if(login_return == 0) {
             continue;
         } else if(login_return == 1){
             if (menu() == -1)

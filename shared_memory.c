@@ -216,14 +216,18 @@ int buy_share(char* username, char* stock, int *shares, double *price){
 		sem_post(shm_mutex);
 		return -3;
 	}
-	if(shared_var->users[u_id].balance < stk->seller_price){
+	
+	
+	if(*shares > stk->seller_shares) *shares = stk->seller_shares;
+	if(*price > stk->seller_price) *price = stk->seller_price;
+	
+	if(shared_var->users[u_id].balance < (*price) * (*shares)){
 		//user balance is not high enough
 		sem_post(shm_mutex);
 		return -4;
 	}
+	
 	//update shares and user balance
-	if(*shares > stk->seller_shares) *shares = stk->seller_shares;
-	if(*price > stk->seller_price) *price = stk->seller_price;
 	stk->seller_shares -= *shares;
 	shared_var->users[u_id].shares[m_id][s_id] += *shares;
 	shared_var->users[u_id].balance -= (*price) * (*shares);
